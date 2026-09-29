@@ -6,10 +6,12 @@
  * `truncate … restart identity cascade` over every app table, then inserts the §4 seed.
  * scripts/db-seed.mjs runs the same file for `npm run db:seed`.
  */
-import { getSql } from "./client";
+import { withTx } from "./client";
 import { SEED_SQL } from "./seed-sql.generated";
 
 /** Truncate all app tables and reload the seed, atomically. */
 export async function resetAndSeed(): Promise<void> {
-  await getSql().begin((tx) => tx.unsafe(SEED_SQL));
+  await withTx(async (tx) => {
+    await tx.unsafe(SEED_SQL);
+  });
 }
