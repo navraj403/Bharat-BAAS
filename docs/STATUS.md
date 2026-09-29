@@ -7,7 +7,10 @@ Phase-level log kept by the PM. Per-agent detail lives in `docs/agents/<id>.md`.
 | Gate | Target time | State | Notes |
 |---|---|---|---|
 | G0 Foundation | 0:20 | **passed** (`e87b35b`) | check 10/10 green, ownership clean, DB seeded and verified to the paisa. PM added optional `vehicleIds` to generate bills |
-| G1 Parallel build (A–E) | 1:05 | **in progress** | Committed: D `1db6d31`, E `a7faa4b`, A `4458fdc`, C `4ac99c9`. B (Biller, Opus) still running; B and C were resumed after an API usage limit |
+| G1 Parallel build (A–E) | 1:05 | **passed** (`7a553c4`) | Lanes D `1db6d31`, E `a7faa4b`, A `4458fdc`, C `4ac99c9`, B `3441dcd`. check 27/27, test:int 26/26, build green. Live COU→NBBL→Biller→OEM fetch for Riya returns ₹6,726.00 |
+| G2 Integration + smoke | 1:30 | **in progress** | Agent I (Opus): smoke script, seam fixes, QA fix list. Dev server on :3000 run by the PM |
+| G3 QA walkthrough | 1:45 | – | |
+| G4 Deployed URL | 2:00 | – | |
 
 ## PM QA notes (fixture-mode walkthrough on :3001) → for Integrator (P2)
 

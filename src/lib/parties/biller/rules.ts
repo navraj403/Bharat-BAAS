@@ -13,6 +13,7 @@ import type {
   ReceivableStatus,
 } from "@/lib/domain/types";
 
+import { formatCycle } from "@/lib/domain/cycle";
 // ASSUMPTION: GST 18% on the OEM bill (the OEM computes it; the biller only labels it).
 export const GST_BPS = 1800;
 // ASSUMPTION: late fee = 2% of an overdue bill's SUBTOTAL, one-time, no GST (docs/DOMAIN.md §4).
@@ -115,13 +116,13 @@ export function buildPresentment(ctx: PresentmentContext, open: OpenCycle[]): Bi
     },
   ];
   for (const o of older) {
-    lines.push({ kind: "ARREARS", label: `Arrears (${o.bill.cycle})`, cycle: o.bill.cycle, amountPaise: o.bill.totalPaise });
+    lines.push({ kind: "ARREARS", label: `Arrears (${formatCycle(o.bill.cycle)})`, cycle: o.bill.cycle, amountPaise: o.bill.totalPaise });
   }
   for (const o of sorted) {
     if (o.lateFeePaise > 0) {
       lines.push({
         kind: "LATE_FEE",
-        label: `Late fee (${o.bill.cycle})`,
+        label: `Late fee (${formatCycle(o.bill.cycle)})`,
         cycle: o.bill.cycle,
         amountPaise: o.lateFeePaise,
         rateBps: LATE_FEE_BPS,

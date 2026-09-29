@@ -48,6 +48,7 @@ import type {
   ResponseCode,
 } from "@/lib/domain/types";
 import { RESPONSE_MESSAGES } from "@/lib/domain/types";
+import { formatCycle } from "@/lib/domain/cycle";
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
@@ -399,12 +400,12 @@ function presentmentFor(s: Store, customer: FxCustomer, unpaid: OemBill[]): Bill
     },
     { kind: "GST", label: "GST @ 18%", cycle: latest.cycle, amountPaise: latest.gstPaise, rateBps: GST_BPS, basePaise: latest.subtotalPaise },
   ];
-  for (const b of older) lines.push({ kind: "ARREARS", label: `Arrears (${b.cycle})`, cycle: b.cycle, amountPaise: b.totalPaise });
+  for (const b of older) lines.push({ kind: "ARREARS", label: `Arrears (${formatCycle(b.cycle)})`, cycle: b.cycle, amountPaise: b.totalPaise });
   const cycles: PresentedCycle[] = sorted.map((b) => {
     const overdue = isOverdue(b);
     const lateFee = overdue ? pctBps(b.subtotalPaise, LATE_FEE_BPS) : 0;
     if (lateFee > 0) {
-      lines.push({ kind: "LATE_FEE", label: `Late fee (${b.cycle})`, cycle: b.cycle, amountPaise: lateFee, rateBps: LATE_FEE_BPS, basePaise: b.subtotalPaise });
+      lines.push({ kind: "LATE_FEE", label: `Late fee (${formatCycle(b.cycle)})`, cycle: b.cycle, amountPaise: lateFee, rateBps: LATE_FEE_BPS, basePaise: b.subtotalPaise });
     }
     return {
       cycle: b.cycle, oemBillId: b.id, oemBillNo: b.billNo, kmDriven: b.kmDriven, subtotalPaise: b.subtotalPaise,
