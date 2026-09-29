@@ -121,6 +121,11 @@ export async function withTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   }
 }
 
+/** True for a Postgres unique_violation (SQLSTATE 23505), e.g. a lost insert race. */
+export function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: unknown }).code === "23505";
+}
+
 /** Close the pool (scripts/tests only; never in route handlers). */
 export async function closeSql(): Promise<void> {
   const client = globalForDb[GLOBAL_KEY];

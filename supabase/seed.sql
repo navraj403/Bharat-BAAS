@@ -15,6 +15,7 @@
 -- ASSUMPTION: GST 18%, due = bill_date + 10 days, late fee 2% of subtotal (docs/DOMAIN.md §4).
 
 truncate table
+  cou_complaints, nbbl_complaint_events, nbbl_complaints,
   cou_payments,
   nbbl_events, nbbl_transactions, nbbl_billers,
   biller_payments, biller_presentments, biller_receivables, biller_customers, biller_billers,
@@ -84,7 +85,7 @@ insert into oem_bills (id, bill_no, vehicle_id, plan_id, cycle, km_driven, fixed
    '11111111-0000-4000-8000-000000000003', 'PRO',
    to_char(date_trunc('month', current_date) - interval '1 month', 'YYYY-MM'),
    1850, 200000, 450, 832500, 1032500, 185850, 1218350,
-   current_date - 5, current_date + 5, 'PAID', 'BCSEEDPAID01', now() - interval '3 days', now() - interval '5 days');
+   current_date - 5, current_date + 5, 'PAID', 'BCSEEDPAID01', now() - interval '4 days 2 hours', now() - interval '5 days');
 
 -- ─── Biller ─────────────────────────────────────────────────────────────────
 insert into biller_billers (id, name, category) values
@@ -156,11 +157,11 @@ insert into biller_presentments (id, biller_id, customer_id, receivable_ids, amo
                            'billDate', to_char(current_date - 5, 'YYYY-MM-DD'),
                            'dueDate', to_char(current_date + 5, 'YYYY-MM-DD'),
                            'status', 'PAID'))),
-   'PAID', now() - interval '3 days' - interval '2 minutes');
+   'PAID', now() - interval '4 days 2 hours' - interval '2 minutes');
 
 insert into biller_payments (id, biller_id, presentment_id, bbps_txn_ref, amount_paise, mode, paid_at) values
   ('66666666-0000-4000-8000-000000000001', 'volt-leasing', '55555555-0000-4000-8000-000000000001',
-   'BCSEEDPAID01', 1218350, 'UPI_AUTOPAY', now() - interval '3 days');
+   'BCSEEDPAID01', 1218350, 'UPI_AUTOPAY', now() - interval '4 days 2 hours');
 
 -- ─── NBBL (registry + Meera's FETCH/PAY so the monitor is not empty) ────────
 insert into nbbl_billers (id, name, category, status) values
@@ -171,38 +172,64 @@ insert into nbbl_transactions (ref, type, cou_id, biller_id, category, customer_
                                response_code, fetch_ref, biller_ref, created_at, completed_at, latency_ms) values
   ('F-SEED000001', 'FETCH', 'DEMOPAY', 'volt-leasing', 'EV_BAAS', 'MH01AB1003 / 98XXXXXX03', 1218350, 'SUCCESS',
    '000', null, '55555555-0000-4000-8000-000000000001',
-   now() - interval '3 days' - interval '2 minutes', now() - interval '3 days' - interval '2 minutes' + interval '142 milliseconds', 142),
+   now() - interval '4 days 2 hours' - interval '2 minutes', now() - interval '4 days 2 hours' - interval '2 minutes' + interval '142 milliseconds', 142),
   ('BCSEEDPAID01', 'PAY', 'DEMOPAY', 'volt-leasing', 'EV_BAAS', 'MH01AB1003 / 98XXXXXX03', 1218350, 'SUCCESS',
    '000', 'F-SEED000001', '55555555-0000-4000-8000-000000000001',
-   now() - interval '3 days' - interval '188 milliseconds', now() - interval '3 days', 188);
+   now() - interval '4 days 2 hours' - interval '188 milliseconds', now() - interval '4 days 2 hours', 188);
 
 insert into nbbl_events (txn_ref, step, payload, at) values
   ('F-SEED000001', 'COU_REQ',
    '{"initiatedBy":"AUTOPAY","couId":"DEMOPAY","billerId":"volt-leasing","category":"EV_BAAS","customerParams":{"vehicleRegNo":"MH01AB1003","registeredMobile":"98XXXXXX03"}}'::jsonb,
-   now() - interval '3 days' - interval '2 minutes'),
+   now() - interval '4 days 2 hours' - interval '2 minutes'),
   ('F-SEED000001', 'BILLER_REQ',
    '{"nbblRef":"F-SEED000001","billerId":"volt-leasing","vehicleNo":"MH01AB1003","mobile":"98XXXXXX03"}'::jsonb,
-   now() - interval '3 days' - interval '2 minutes' + interval '12 milliseconds'),
+   now() - interval '4 days 2 hours' - interval '2 minutes' + interval '12 milliseconds'),
   ('F-SEED000001', 'BILLER_RESP',
    '{"result":"BILL_DUE","responseCode":"000","presentmentId":"55555555-0000-4000-8000-000000000001","amountPaise":1218350}'::jsonb,
-   now() - interval '3 days' - interval '2 minutes' + interval '130 milliseconds'),
+   now() - interval '4 days 2 hours' - interval '2 minutes' + interval '130 milliseconds'),
   ('F-SEED000001', 'COU_RESP',
    '{"fetchRef":"F-SEED000001","result":"BILL_DUE","responseCode":"000","amountPaise":1218350}'::jsonb,
-   now() - interval '3 days' - interval '2 minutes' + interval '142 milliseconds'),
+   now() - interval '4 days 2 hours' - interval '2 minutes' + interval '142 milliseconds'),
   ('BCSEEDPAID01', 'COU_REQ',
    '{"initiatedBy":"AUTOPAY","couId":"DEMOPAY","fetchRef":"F-SEED000001","amountPaise":1218350,"mode":"UPI_AUTOPAY","couOrderId":"DP-SEED000001"}'::jsonb,
-   now() - interval '3 days' - interval '188 milliseconds'),
+   now() - interval '4 days 2 hours' - interval '188 milliseconds'),
   ('BCSEEDPAID01', 'PAY_REQ',
    '{"billerId":"volt-leasing","presentmentId":"55555555-0000-4000-8000-000000000001","amountPaise":1218350,"bbpsTxnRef":"BCSEEDPAID01","mode":"UPI_AUTOPAY"}'::jsonb,
-   now() - interval '3 days' - interval '170 milliseconds'),
+   now() - interval '4 days 2 hours' - interval '170 milliseconds'),
   ('BCSEEDPAID01', 'ADVICE_ACK',
    '{"ack":true,"responseCode":"000","bbpsTxnRef":"BCSEEDPAID01","billerPaymentId":"66666666-0000-4000-8000-000000000001"}'::jsonb,
-   now() - interval '3 days' - interval '15 milliseconds'),
+   now() - interval '4 days 2 hours' - interval '15 milliseconds'),
   ('BCSEEDPAID01', 'COU_RESP',
    '{"status":"SUCCESS","responseCode":"000","bbpsTxnRef":"BCSEEDPAID01"}'::jsonb,
-   now() - interval '3 days');
+   now() - interval '4 days 2 hours');
 
 -- ─── COU (DemoPay) ──────────────────────────────────────────────────────────
 insert into cou_payments (order_id, fetch_ref, bbps_txn_ref, biller_id, vehicle_reg_no, amount_paise, mode, status, created_at, updated_at) values
   ('DP-SEED000001', 'F-SEED000001', 'BCSEEDPAID01', 'volt-leasing', 'MH01AB1003', 1218350, 'UPI_AUTOPAY', 'SUCCESS',
-   now() - interval '3 days' - interval '200 milliseconds', now() - interval '3 days');
+   now() - interval '4 days 2 hours' - interval '200 milliseconds', now() - interval '4 days 2 hours');
+
+-- ─── Complaints (docs/COMPLAINTS_PLAN.md; tables from migrations/0002_complaints.sql) ─────
+-- Riya's FAILED order: mock UPI declined after the fetch, so NBBL never got a PAY (no bbps ref).
+-- Raising "Payment deducted but transaction failed" on it auto-triages to the COU (DemoPay).
+insert into cou_payments (order_id, fetch_ref, bbps_txn_ref, biller_id, vehicle_reg_no, amount_paise, mode, status, created_at, updated_at) values
+  ('DP-SEED000002', 'F-SEED000002', null, 'bajaj-finance', 'MH01AB1001', 672600, 'UPI', 'FAILED',
+   now() - interval '1 day', now() - interval '1 day' + interval '3 seconds');
+
+-- Meera's pre-existing ticket on DP-SEED000001 / BCSEEDPAID01: "paid but bill still pending",
+-- pending with the biller (Volt Leasing). Raised 4 days ago with a 3-day SLA → already OVERDUE.
+-- ASSUMPTION: SLA PAID_BILL_PENDING = 3 calendar days (src/lib/domain/complaints.ts SLA_DAYS).
+insert into nbbl_complaints (complaint_id, cou_id, cou_ticket_no, order_id, txn_ref, biller_id, customer_ref_masked,
+                             amount_paise, reason, description, status, pending_with, resolution, due_at,
+                             created_at, updated_at, closed_at) values
+  ('CCSEED000001', 'DEMOPAY', 'DPT-SEED0001', 'DP-SEED000001', 'BCSEEDPAID01', 'volt-leasing', 'MH01AB1003 / 98XXXXXX03',
+   1218350, 'PAID_BILL_PENDING', 'Paid through AutoPay but the biller still shows the bill as due.', 'OPEN', 'BILLER', null,
+   now() - interval '4 days' + interval '3 days',
+   now() - interval '4 days', now() - interval '4 days' + interval '1 second', null);
+
+insert into nbbl_complaint_events (complaint_id, action, from_party, to_party, actor, note, at) values
+  ('CCSEED000001', 'RAISED',   null, null,     'DEMOPAY', 'Paid through AutoPay but the biller still shows the bill as due.', now() - interval '4 days'),
+  ('CCSEED000001', 'ASSIGNED', null, 'BILLER', 'SYSTEM',  'Auto-triage: paid bill not posted, pending with the biller.',       now() - interval '4 days' + interval '1 second');
+
+insert into cou_complaints (ticket_no, order_id, complaint_id, reason, description, created_at) values
+  ('DPT-SEED0001', 'DP-SEED000001', 'CCSEED000001', 'PAID_BILL_PENDING',
+   'Paid through AutoPay but the biller still shows the bill as due.', now() - interval '4 days');

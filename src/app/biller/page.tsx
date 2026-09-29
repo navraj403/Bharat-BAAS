@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { billerSync, getBillerOverview } from "@/lib/client/api";
-import type { BillerCustomerRow, BillerPaymentRow, BillerReceivableRow } from "@/lib/domain/types";
+import { billerSync, getBillerOverview, getNbblComplaints } from "@/lib/client/api";
+import { COMPLAINT_REASON_LABELS, type BillerCustomerRow, type BillerPaymentRow, type BillerReceivableRow, type NbblComplaint } from "@/lib/domain/types";
 import { Button, Card, DataTable, ErrorState, KpiTile, LoadingState, Money, StatusPill, formatDateTime, formatRegNo, type Column } from "@/components/ui";
 import { Notice, PageHeader, errMsg } from "@/components/consoles/PageShell";
 import { useAsync } from "@/components/consoles/useAsync";
@@ -41,9 +41,22 @@ const paymentCols: Column<BillerPaymentRow>[] = [
   { key: "at", header: "Paid at", render: (p) => formatDateTime(p.paidAt) },
 ];
 
+const complaintCols: Column<NbblComplaint>[] = [
+  { key: "id", header: "Complaint", render: (c) => <span className="font-mono">{c.complaintId}</span> },
+  { key: "txn", header: "Txn ref", render: (c) => (c.txnRef ? <span className="font-mono">{c.txnRef}</span> : "-") },
+  { key: "reason", header: "Reason", render: (c) => COMPLAINT_REASON_LABELS[c.reason] },
+  { key: "amt", header: "Amount", align: "right", render: (c) => <Money paise={c.amountPaise} /> },
+  { key: "due", header: "Due", render: (c) => (<span className="inline-flex items-center gap-2">{formatDateTime(c.dueAt)}{c.overdue ? <StatusPill status="OVERDUE" label="Overdue" /> : null}</span>) },
+];
+
 export default function BillerPage() {
   const [billerId, setBillerId] = useState(BILLERS[0].id);
   const overview = useAsync(() => getBillerOverview(billerId), billerId);
+  const complaints = useAsync(
+    async () => (await getNbblComplaints({ status: "OPEN", pendingWith: "BILLER" })).filter((c) => c.billerId === billerId),
+    `complaints:${billerId}`,
+    { intervalMs: 3000 },
+  );
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
 
@@ -113,6 +126,15 @@ export default function BillerPage() {
           </Card>
           <Card title="Receivables" className="mb-6">
             <DataTable caption="Receivables" columns={receivableCols} rows={o.receivables} rowKey={(r) => r.id} empty="No receivables yet. Try Sync from OEM." />
+          </Card>
+          <Card title="Complaints pending with you" className="mb-6">
+            {complaints.error ? (
+              <ErrorState error={complaints.error} onRetry={() => void complaints.reload()} />
+            ) : !complaints.data ? (
+              <LoadingState label="Loading complaints..." />
+            ) : (
+              <DataTable caption="Complaints pending with this biller" columns={complaintCols} rows={complaints.data} rowKey={(c) => c.complaintId} empty="No open complaints pending with you." />
+            )}
           </Card>
           <Card title="Payments">
             <DataTable caption="Payments received" columns={paymentCols} rows={o.payments} rowKey={(p) => p.id} empty="No payments received yet" />

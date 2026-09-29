@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getNbblStats, getNbblTransaction, getNbblTransactions } from "@/lib/client/api";
 import type { NbblEvent, NbblTxn } from "@/lib/domain/types";
 import { Button, Card, DataTable, ErrorState, KpiTile, LoadingState, Money, StatusPill, formatDateTime, formatNumber, type Column } from "@/components/ui";
+import { ComplaintsView } from "./ComplaintsView";
 import { PageHeader } from "@/components/consoles/PageShell";
 import { useAsync } from "@/components/consoles/useAsync";
 
@@ -81,6 +82,7 @@ function Timeline({ txnRef, paused }: { txnRef: string; paused: boolean }) {
 export default function NbblPage() {
   const [paused, setPaused] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<"txns" | "complaints">("txns");
   const stats = useAsync(getNbblStats, "stats", { intervalMs: 3000, paused });
   const txns = useAsync(() => getNbblTransactions({ limit: 100 }), "txns", { intervalMs: 3000, paused });
 
@@ -104,14 +106,34 @@ export default function NbblPage() {
       />
 
       <div role="tablist" aria-label="NBBL views" className="mb-4 flex gap-1 border-b border-line">
-        <button type="button" role="tab" aria-selected="true" className="border-b-2 border-accent px-3 py-2 text-sm font-medium text-accent">
-          Transactions
-        </button>
-        <button type="button" role="tab" aria-selected="false" disabled className="cursor-not-allowed px-3 py-2 text-sm text-ink-faint">
-          Disputes &mdash; Phase 2
-        </button>
+        {(["txns", "complaints"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            id={`tab-${t}`}
+            aria-selected={tab === t}
+            aria-controls={`panel-${t}`}
+            onClick={() => setTab(t)}
+            className={`px-3 py-2 text-sm font-medium ${tab === t ? "border-b-2 border-accent text-accent" : "text-ink-muted hover:text-ink"}`}
+          >
+            {t === "txns" ? "Transactions" : "Complaints"}
+          </button>
+        ))}
       </div>
 
+      {tab === "complaints" ? (
+        <div role="tabpanel" id="panel-complaints" aria-labelledby="tab-complaints">
+          <ComplaintsView
+            paused={paused}
+            onViewTxn={(ref) => {
+              setSelected(ref);
+              setTab("txns");
+            }}
+          />
+        </div>
+      ) : (
+      <div role="tabpanel" id="panel-txns" aria-labelledby="tab-txns">
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTile label="Bill fetches" value={s ? formatNumber(s.fetches) : "-"} />
         <KpiTile label="Payments" value={s ? formatNumber(s.payments) : "-"} />
@@ -138,6 +160,8 @@ export default function NbblPage() {
       </Card>
 
       {selected ? <Timeline txnRef={selected} paused={paused} /> : null}
+      </div>
+      )}
     </main>
   );
 }

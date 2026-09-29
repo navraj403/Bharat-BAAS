@@ -18,7 +18,10 @@ export const APP_TABLES: ReadonlyArray<{ party: Party; table: string }> = [
   { party: "nbbl", table: "nbbl_billers" },
   { party: "nbbl", table: "nbbl_transactions" },
   { party: "nbbl", table: "nbbl_events" },
+  { party: "nbbl", table: "nbbl_complaints" },
+  { party: "nbbl", table: "nbbl_complaint_events" },
   { party: "cou", table: "cou_payments" },
+  { party: "cou", table: "cou_complaints" },
 ];
 
 /** Returns the whitelisted entry for `name`, or undefined. */

@@ -1,5 +1,15 @@
 # Agent E: Consoles + app shell UI
 
+## Phase C: Complaints
+
+**State:** DONE (check green; not browser-verified)
+**Working on:** nothing
+**Done:** NBBL Complaints tab (tablist, KPIs, filters, table, detail panel with linked txn, timeline, assign/note/close/reopen, inline errors, 3s polling honouring Pause); "View hop timeline" switches to Transactions with the ref selected; StatusPill tones for CLOSED/COU/NBBL/BILLER; stretch: "Complaints pending with you" card on /biller.
+**Pending:** none
+**Files touched:** src/app/nbbl/ComplaintsView.tsx, src/app/nbbl/page.tsx, src/app/biller/page.tsx, src/components/ui/StatusPill.tsx
+**Contract questions:** none
+
+
 **Model:** Sonnet · **Phase:** P1 · **State:** DONE
 **Last update:** P1
 

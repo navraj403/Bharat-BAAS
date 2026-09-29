@@ -15,6 +15,12 @@ import type {
   BillPaymentResponse,
   BillerSummary,
   Category,
+  ComplaintActionRequest,
+  NbblComplaint,
+  NbblComplaintDetail,
+  NbblComplaintQuery,
+  NbblComplaintStats,
+  NbblRaiseComplaintRequest,
   NbblStats,
   NbblTxn,
   NbblTxnDetail,
@@ -23,6 +29,23 @@ import type {
   ResponseMeta,
 } from "@/lib/domain/types";
 import { RESPONSE_MESSAGES } from "@/lib/domain/types";
+import {
+  ComplaintInputError,
+  ComplaintNotFoundError,
+  ComplaintTransitionError,
+  applyAction,
+  dueAt as complaintDueAt,
+  initialAssignee,
+  isComplaintParty,
+  isComplaintReason,
+  isComplaintStatus,
+  newComplaintId,
+  normaliseDescription,
+  summariseComplaints,
+  triageNote,
+} from "@/lib/domain/complaints";
+import { isUniqueViolation } from "@/lib/db/client";
+import * as complaintsRepo from "./complaints-repo";
 import * as repo from "./repo";
 import { maskMobile, newBbpsTxnRef, newFetchRef, normaliseVehicleNo } from "./util";
 
@@ -294,4 +317,148 @@ export async function getTransaction(ref: string): Promise<NbblTxnDetail | null>
 /** `GET /api/nbbl/stats`. */
 export async function stats(): Promise<NbblStats> {
   return repo.computeStats();
+}
+
+// ─── Complaints (Phase C, docs/COMPLAINTS_PLAN.md). STUBS: agent C implements. ───────────
+//
+// Tables: nbbl_complaints + nbbl_complaint_events (supabase/migrations/0002_complaints.sql).
+// Pure rules (SLA, triage, transitions, refs) are in src/lib/domain/complaints.ts: use
+// dueAt, initialAssignee, applyAction, summariseComplaints, isOverdue, newComplaintId.
+//
+// Error convention (routes map these via err.status / err.code → { error: { code, message } }):
+// - ComplaintInputError      → 400 BAD_REQUEST        (bad/missing field)
+// - ComplaintNotFoundError   → 404 NOT_FOUND          (unknown complaint id on a MUTATION)
+// - ComplaintTransitionError → 409 INVALID_TRANSITION (action not allowed in current state)
+// Getters (getComplaint) return null for an unknown id instead of throwing; the route returns 404.
+export {
+  ComplaintError,
+  ComplaintInputError,
+  ComplaintNotFoundError,
+  ComplaintTransitionError,
+} from "@/lib/domain/complaints";
+
+/**
+ * COU → NBBL (server-side only). Opens a BBPS complaint for a COU order.
+ * - Looks up the PAY txn by `bbpsTxnRef` (if any): its status drives `initialAssignee`, its
+ *   `customerRefMasked` is copied (else the vehicle reg no, else null). Stores MASKED refs only.
+ * - billerName is resolved from nbbl_billers.
+ * - dueAt = complaints.dueAt(now, reason). Writes RAISED (actor = couId, note = description)
+ *   then ASSIGNED (from null → initial party, actor SYSTEM) events.
+ * - Idempotent: an OPEN complaint for the same (couId, orderId, reason) is returned unchanged
+ *   (no new rows; the caller should reuse its couTicketNo).
+ * Throws ComplaintInputError for an invalid reason/description/amount.
+ */
+export async function raiseComplaint(req: NbblRaiseComplaintRequest): Promise<NbblComplaint> {
+  if (!isComplaintReason(req?.reason)) throw new ComplaintInputError("reason is not a valid complaint reason");
+  const description = normaliseDescription(req.description);
+  if (!req.couId || !req.orderId || !req.couTicketNo) {
+    throw new ComplaintInputError("couId, couTicketNo and orderId are required");
+  }
+  if (!Number.isInteger(req.amountPaise) || req.amountPaise < 0) {
+    throw new ComplaintInputError("amountPaise must be a non-negative integer");
+  }
+
+  const existing = await complaintsRepo.findOpenByOrder(req.couId, req.orderId, req.reason);
+  if (existing) return existing;
+
+  const payTxn = req.bbpsTxnRef ? await repo.getTxn(req.bbpsTxnRef) : null;
+  const pay = payTxn && payTxn.type === "PAY" ? payTxn : null;
+  const pendingWith = initialAssignee(req.reason, pay?.status ?? null);
+  const createdAt = new Date().toISOString();
+  const complaintId = newComplaintId();
+  try {
+    await complaintsRepo.insertComplaint(
+      {
+        complaintId,
+        couId: req.couId,
+        couTicketNo: req.couTicketNo,
+        orderId: req.orderId,
+        txnRef: pay?.ref ?? null,
+        billerId: pay?.billerId ?? req.billerId,
+        // NBBL stores masked refs only: the PAY txn's, else the (non-sensitive) vehicle reg no.
+        customerRefMasked: pay?.customerRefMasked ?? (req.vehicleRegNo ? normaliseVehicleNo(req.vehicleRegNo) : null),
+        amountPaise: req.amountPaise,
+        reason: req.reason,
+        description,
+        pendingWith,
+        dueAt: complaintDueAt(createdAt, req.reason),
+        createdAt,
+      },
+      triageNote(req.reason, pay?.status ?? null),
+    );
+  } catch (err) {
+    // Race: a concurrent raise inserted the OPEN complaint first (nbbl_complaints_open_uq, 0003).
+    if (!isUniqueViolation(err)) throw err;
+    const winner = await complaintsRepo.findOpenByOrder(req.couId, req.orderId, req.reason);
+    if (winner) return winner;
+    throw err;
+  }
+  const created = await complaintsRepo.getComplaint(complaintId);
+  if (!created) throw new Error("Complaint vanished after insert");
+  return created;
+}
+
+/**
+ * `GET /api/nbbl/complaints?status=&pendingWith=`. Newest first. `couId` (server-side only, used
+ * by the COU to read its own tickets' live status) filters to one COU. `overdue` derived at read.
+ */
+export async function listComplaints(
+  query?: NbblComplaintQuery & { couId?: string },
+): Promise<NbblComplaint[]> {
+  if (query?.status !== undefined && !isComplaintStatus(query.status)) {
+    throw new ComplaintInputError("status must be OPEN or CLOSED");
+  }
+  if (query?.pendingWith !== undefined && !isComplaintParty(query.pendingWith)) {
+    throw new ComplaintInputError("pendingWith must be COU, NBBL or BILLER");
+  }
+  return complaintsRepo.listComplaints({
+    status: query?.status,
+    pendingWith: query?.pendingWith,
+    couId: query?.couId,
+  });
+}
+
+/** `GET /api/nbbl/complaints/:id`. Complaint + events (oldest first) + linked PAY txn. Null if unknown. */
+export async function getComplaint(complaintId: string): Promise<NbblComplaintDetail | null> {
+  const c = await complaintsRepo.getComplaint(complaintId);
+  if (!c) return null;
+  const [events, txn] = await Promise.all([
+    complaintsRepo.listComplaintEvents(complaintId),
+    c.txnRef ? repo.getTxn(c.txnRef) : Promise.resolve(null),
+  ]);
+  return { ...c, events, linkedTxn: txn && txn.type === "PAY" ? txn : null };
+}
+
+/**
+ * `POST /api/nbbl/complaints/:id/actions`. Validates + applies via complaints.applyAction, updates
+ * the row (status, pending_with, resolution, closed_at, updated_at) and inserts the event in one
+ * transaction. Returns the fresh detail.
+ * Throws ComplaintNotFoundError (404), ComplaintInputError (400), ComplaintTransitionError (409).
+ */
+export async function complaintAction(
+  complaintId: string,
+  req: ComplaintActionRequest,
+): Promise<NbblComplaintDetail> {
+  let found: boolean;
+  try {
+    found = await complaintsRepo.applyLocked(complaintId, (current) => {
+      const { next, event } = applyAction(current, req);
+      return { ...next, event };
+    });
+  } catch (err) {
+    // REOPEN while a newer OPEN complaint exists for the same (COU, order, reason): nbbl_complaints_open_uq.
+    if (isUniqueViolation(err)) {
+      throw new ComplaintTransitionError("Another open complaint already exists for this order and reason");
+    }
+    throw err;
+  }
+  if (!found) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);
+  const detail = await getComplaint(complaintId);
+  if (!detail) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);
+  return detail;
+}
+
+/** `GET /api/nbbl/complaints/stats`. KPIs over all complaints (complaints.summariseComplaints). */
+export async function complaintStats(): Promise<NbblComplaintStats> {
+  return summariseComplaints(await complaintsRepo.listComplaints({}));
 }

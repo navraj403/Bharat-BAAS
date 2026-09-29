@@ -28,15 +28,25 @@ const CATEGORIES: { id: string; label: string; icon: IconName; enabled?: boolean
   { id: "more", label: "More", icon: "dots" },
 ];
 
-export function HomeScreen({ onEv }: { onEv: () => void }) {
+export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => void }) {
   return (
     <div className="flex h-full flex-col bg-pay-canvas">
       <header className="shrink-0 bg-pay-deep px-4 pb-4 pt-4 text-white">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">DemoPay</h1>
-          <span className="flex gap-3" aria-hidden="true">
-            <Icon name="bell" />
-            <Icon name="user" />
+          <span className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onHelp}
+              aria-label="Help & support"
+              className="flex size-8 items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <Icon name="support" />
+            </button>
+            <span className="flex gap-3" aria-hidden="true">
+              <Icon name="bell" />
+              <Icon name="user" />
+            </span>
           </span>
         </div>
         <button
@@ -108,6 +118,21 @@ export function HomeScreen({ onEv }: { onEv: () => void }) {
             <span className="block text-xs text-pay">Pay-per-km BaaS bills, now on Bharat Connect</span>
           </span>
           <Icon name="chevron" className="size-4 text-pay" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onHelp}
+          className={`flex w-full items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left ${FOCUS}`}
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pay-soft text-pay">
+            <Icon name="support" className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">Help &amp; support</span>
+            <span className="block text-xs text-ink-muted">Raise a complaint about a payment · Track your tickets</span>
+          </span>
+          <Icon name="chevron" className="size-4 text-ink-faint" />
         </button>
       </div>
       <BharatConnect />

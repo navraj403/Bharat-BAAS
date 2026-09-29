@@ -10,7 +10,8 @@ if (!url) {
 const tables = [
   "oem_plans", "oem_vehicles", "oem_trips", "oem_bills",
   "biller_billers", "biller_customers", "biller_receivables", "biller_presentments", "biller_payments",
-  "nbbl_billers", "nbbl_transactions", "nbbl_events", "cou_payments",
+  "nbbl_billers", "nbbl_transactions", "nbbl_events", "nbbl_complaints", "nbbl_complaint_events",
+  "cou_payments", "cou_complaints",
 ];
 const sql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
 try {

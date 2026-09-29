@@ -5,6 +5,9 @@ const PATHS: Record<string, ReactNode> = {
   search: (<><circle cx="10" cy="10" r="7" /><path d="m21 21-6-6" /></>),
   bell: (<><path d="M10 5a2 2 0 1 1 4 0 7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></>),
   user: (<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="10" r="3" /><path d="M6.2 18.8a6 6 0 0 1 11.6 0" /></>),
+  help: (<><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01" /></>),
+  // Customer-support agent: head, headband, ear cups and a mic boom.
+  support: (<><circle cx="12" cy="9" r="3.5" /><path d="M6.5 10a5.5 5.5 0 0 1 11 0" /><rect x="5" y="9.5" width="2.5" height="4" rx="1.2" /><rect x="16.5" y="9.5" width="2.5" height="4" rx="1.2" /><path d="M17.75 13.5v.5a2.5 2.5 0 0 1-2.5 2.5H13M5.5 21a6.5 6.5 0 0 1 13 0" /></>),
   back: <path d="M5 12h14M5 12l6 6M5 12l6-6" />,
   chevron: <path d="m9 6 6 6-6 6" />,
   chevronUp: <path d="m6 15 6-6 6 6" />,

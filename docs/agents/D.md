@@ -1,5 +1,16 @@
 # Agent D: Customer app UI
 
+## Phase C: Complaints
+
+**State:** WORKING
+**Working on:** COU Help & support (HelpScreens.tsx, Home entry points, CouApp wiring)
+**Done:** read contract and existing UI
+**Pending:** build, check, ownership
+**Files touched:** (see below at finish)
+**Contract questions:** none
+
+---
+
 **Model:** Sonnet · **Phase:** P1 · **State:** DONE
 **Last update:** P1
 

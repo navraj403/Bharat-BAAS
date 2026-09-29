@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { SEED_SQL } from "./seed-sql.generated";
@@ -17,8 +17,13 @@ describe("seed SQL", () => {
     for (const { table } of APP_TABLES) expect(truncate).toContain(table);
   });
 
-  it("every app table is created by the migration", () => {
-    const migration = readFileSync(join(root, "supabase", "migrations", "0001_init.sql"), "utf8");
+  it("every app table is created by a migration", () => {
+    const dir = join(root, "supabase", "migrations");
+    const migration = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => readFileSync(join(dir, f), "utf8"))
+      .join("\n");
     for (const { table } of APP_TABLES) expect(migration).toContain(`create table if not exists ${table} (`);
   });
 });

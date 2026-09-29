@@ -9,10 +9,13 @@
     "docs/STATUS.md",
     "docs/BUILD_PLAN.md",
     "docs/DOMAIN.md",
-    "docs/agents/_TEMPLATE.md"
+    "docs/agents/_TEMPLATE.md",
+    "docs/COMPLAINTS_PLAN.md"
   ],
   "F": [
     "src/lib/domain/types.ts",
+    "src/lib/domain/complaints.ts",
+    "src/lib/domain/complaints.test.ts",
     "src/lib/db/**",
     "src/lib/client/**",
     "src/lib/parties/*/api.ts",

@@ -5,10 +5,11 @@ import { couFetch, couPay, getCouBillers } from "@/lib/client/api";
 import type { BillPresentment, BillerSummary, PaymentMode } from "@/lib/domain/types";
 import { BillersScreen, DetailsScreen, HomeScreen, type BillersState, type InlineResult, type RecentFetch } from "./Screens";
 import { BillScreen, ReceiptScreen, type ReceiptView } from "./ResultScreens";
+import { HelpScreen } from "./HelpScreens";
 import { PaySheet } from "./PaySheet";
 import { normaliseVehicle } from "./format";
 
-type Screen = "home" | "billers" | "details" | "bill" | "receipt";
+type Screen = "home" | "billers" | "details" | "bill" | "receipt" | "help";
 
 /** A payable bill and the NBBL fetch it came from. */
 interface DueBill {
@@ -133,7 +134,8 @@ export function CouApp() {
   }
 
   let content;
-  if (screen === "home") content = <HomeScreen onEv={openEv} />;
+  if (screen === "home") content = <HomeScreen onEv={openEv} onHelp={() => setScreen("help")} />;
+  else if (screen === "help") content = <HelpScreen onBack={() => setScreen("home")} />;
   else if (screen === "billers")
     content = (
       <BillersScreen
