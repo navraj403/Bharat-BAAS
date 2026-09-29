@@ -28,15 +28,25 @@ const CATEGORIES: { id: string; label: string; icon: IconName; enabled?: boolean
   { id: "more", label: "More", icon: "dots" },
 ];
 
-export function HomeScreen({ onEv }: { onEv: () => void }) {
+export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => void }) {
   return (
     <div className="flex h-full flex-col bg-pay-canvas">
       <header className="shrink-0 bg-pay-deep px-4 pb-4 pt-4 text-white">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">DemoPay</h1>
-          <span className="flex gap-3" aria-hidden="true">
-            <Icon name="bell" />
-            <Icon name="user" />
+          <span className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onHelp}
+              aria-label="Help & support"
+              className="flex size-8 items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <Icon name="help" />
+            </button>
+            <span className="flex gap-3" aria-hidden="true">
+              <Icon name="bell" />
+              <Icon name="user" />
+            </span>
           </span>
         </div>
         <button
