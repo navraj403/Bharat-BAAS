@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { couFetch, couPay, getCouBillers } from "@/lib/client/api";
 import type { BillPresentment, BillerSummary, PaymentMode } from "@/lib/domain/types";
 import { BillersScreen, DetailsScreen, HomeScreen, type BillersState, type InlineResult, type RecentFetch } from "./Screens";
@@ -18,6 +18,23 @@ interface DueBill {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const FRAME_H = 800;
+// Site nav + disclaimer footer + page padding around the frame.
+const CHROME_H = 120;
+
+/** On screens ≥480px wide, the zoom that fits the 800px phone frame in the window (never above 1). */
+function useFrameZoom(): number {
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const fit = () =>
+      setZoom(window.innerWidth < 480 ? 1 : Math.max(0.6, Math.min(1, (window.innerHeight - CHROME_H) / FRAME_H)));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  return zoom;
+}
+
 export function CouApp() {
   const [screen, setScreen] = useState<Screen>("home");
   const [billers, setBillers] = useState<BillersState>({ status: "loading" });
@@ -33,6 +50,7 @@ export function CouApp() {
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptView | null>(null);
+  const frameZoom = useFrameZoom();
 
   async function loadBillers() {
     setBillers({ status: "loading" });
@@ -170,7 +188,11 @@ export function CouApp() {
     );
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-pay-canvas min-[480px]:h-[800px] min-[480px]:w-[390px] min-[480px]:rounded-[2rem] min-[480px]:border-8 min-[480px]:border-ink min-[480px]:shadow-card">
+    // Phone: full screen. Wider screens: a 390×800 phone frame, zoomed down evenly to fit the window.
+    <div
+      style={frameZoom < 1 ? { zoom: frameZoom } : undefined}
+      className="relative h-dvh w-full overflow-hidden bg-pay-canvas min-[480px]:h-[800px] min-[480px]:w-[390px] min-[480px]:rounded-[2.5rem] min-[480px]:border-[10px] min-[480px]:border-ink min-[480px]:shadow-card"
+    >
       {content}
       {payOpen && due && (
         <PaySheet
