@@ -15,6 +15,12 @@ import type {
   BillPaymentResponse,
   BillerSummary,
   Category,
+  ComplaintActionRequest,
+  NbblComplaint,
+  NbblComplaintDetail,
+  NbblComplaintQuery,
+  NbblComplaintStats,
+  NbblRaiseComplaintRequest,
   NbblStats,
   NbblTxn,
   NbblTxnDetail,
@@ -294,4 +300,75 @@ export async function getTransaction(ref: string): Promise<NbblTxnDetail | null>
 /** `GET /api/nbbl/stats`. */
 export async function stats(): Promise<NbblStats> {
   return repo.computeStats();
+}
+
+// ─── Complaints (Phase C, docs/COMPLAINTS_PLAN.md). STUBS: agent C implements. ───────────
+//
+// Tables: nbbl_complaints + nbbl_complaint_events (supabase/migrations/0002_complaints.sql).
+// Pure rules (SLA, triage, transitions, refs) are in src/lib/domain/complaints.ts: use
+// dueAt, initialAssignee, applyAction, summariseComplaints, isOverdue, newComplaintId.
+//
+// Error convention (routes map these via err.status / err.code → { error: { code, message } }):
+// - ComplaintInputError      → 400 BAD_REQUEST        (bad/missing field)
+// - ComplaintNotFoundError   → 404 NOT_FOUND          (unknown complaint id on a MUTATION)
+// - ComplaintTransitionError → 409 INVALID_TRANSITION (action not allowed in current state)
+// Getters (getComplaint) return null for an unknown id instead of throwing; the route returns 404.
+export {
+  ComplaintError,
+  ComplaintInputError,
+  ComplaintNotFoundError,
+  ComplaintTransitionError,
+} from "@/lib/domain/complaints";
+
+/**
+ * COU → NBBL (server-side only). Opens a BBPS complaint for a COU order.
+ * - Looks up the PAY txn by `bbpsTxnRef` (if any): its status drives `initialAssignee`, its
+ *   `customerRefMasked` is copied (else the vehicle reg no, else null). Stores MASKED refs only.
+ * - billerName is resolved from nbbl_billers.
+ * - dueAt = complaints.dueAt(now, reason). Writes RAISED (actor = couId, note = description)
+ *   then ASSIGNED (from null → initial party, actor SYSTEM) events.
+ * - Idempotent: an OPEN complaint for the same (couId, orderId, reason) is returned unchanged
+ *   (no new rows; the caller should reuse its couTicketNo).
+ * Throws ComplaintInputError for an invalid reason/description/amount.
+ */
+export async function raiseComplaint(req: NbblRaiseComplaintRequest): Promise<NbblComplaint> {
+  void req;
+  throw new Error("NotImplemented");
+}
+
+/**
+ * `GET /api/nbbl/complaints?status=&pendingWith=`. Newest first. `couId` (server-side only, used
+ * by the COU to read its own tickets' live status) filters to one COU. `overdue` derived at read.
+ */
+export async function listComplaints(
+  query?: NbblComplaintQuery & { couId?: string },
+): Promise<NbblComplaint[]> {
+  void query;
+  throw new Error("NotImplemented");
+}
+
+/** `GET /api/nbbl/complaints/:id`. Complaint + events (oldest first) + linked PAY txn. Null if unknown. */
+export async function getComplaint(complaintId: string): Promise<NbblComplaintDetail | null> {
+  void complaintId;
+  throw new Error("NotImplemented");
+}
+
+/**
+ * `POST /api/nbbl/complaints/:id/actions`. Validates + applies via complaints.applyAction, updates
+ * the row (status, pending_with, resolution, closed_at, updated_at) and inserts the event in one
+ * transaction. Returns the fresh detail.
+ * Throws ComplaintNotFoundError (404), ComplaintInputError (400), ComplaintTransitionError (409).
+ */
+export async function complaintAction(
+  complaintId: string,
+  req: ComplaintActionRequest,
+): Promise<NbblComplaintDetail> {
+  void complaintId;
+  void req;
+  throw new Error("NotImplemented");
+}
+
+/** `GET /api/nbbl/complaints/stats`. KPIs over all complaints (complaints.summariseComplaints). */
+export async function complaintStats(): Promise<NbblComplaintStats> {
+  throw new Error("NotImplemented");
 }

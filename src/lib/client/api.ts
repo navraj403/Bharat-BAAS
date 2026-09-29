@@ -25,12 +25,19 @@ import type {
   BillerSummary,
   BillerSyncResponse,
   Category,
+  ComplaintActionRequest,
+  CouComplaint,
   CouFetchRequest,
+  CouOrder,
   CouPayRequest,
   Cycle,
   FetchResult,
   GenerateBillsResponse,
   Km,
+  NbblComplaint,
+  NbblComplaintDetail,
+  NbblComplaintQuery,
+  NbblComplaintStats,
   NbblStats,
   NbblTxn,
   NbblTxnDetail,
@@ -40,8 +47,10 @@ import type {
   PayResult,
   PaymentAdvice,
   PaymentAdviceAck,
+  RaiseComplaintRequest,
   ResetResponse,
 } from "@/lib/domain/types";
+import { ComplaintError } from "@/lib/domain/complaints";
 import * as fx from "./fixtures";
 
 /** True when the UI should use local fixtures instead of the API. */
@@ -100,6 +109,8 @@ async function fixture<T>(produce: () => T, notFoundIfNull = false): Promise<T> 
   try {
     value = produce();
   } catch (err) {
+    // Complaint errors carry the real route's status/code (400 / 404 / 409 INVALID_TRANSITION).
+    if (err instanceof ComplaintError) throw new ApiError(err.code, err.message, err.status);
     throw new ApiError("BAD_REQUEST", err instanceof Error ? err.message : "Bad request", 400);
   }
   if (notFoundIfNull && value === null) throw new ApiError("NOT_FOUND", "Not found", 404);
@@ -130,6 +141,27 @@ export function couFetch(req: CouFetchRequest): Promise<FetchResult> {
 export function couPay(req: CouPayRequest): Promise<PayResult> {
   if (USE_FIXTURES) return fixture(() => fx.fixturePay(req));
   return request("POST", "/api/cou/pay", req);
+}
+
+/** `GET /api/cou/orders`: the customer's orders (payments), newest first. */
+export function getCouOrders(): Promise<CouOrder[]> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureOrders());
+  return request("GET", "/api/cou/orders");
+}
+
+/**
+ * `POST /api/cou/complaints`: raise a complaint on an order. Idempotent: an OPEN ticket for the same
+ * order + reason is returned as is. 400 BAD_REQUEST (reason/description), 404 NOT_FOUND (order).
+ */
+export function raiseCouComplaint(req: RaiseComplaintRequest): Promise<CouComplaint> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureRaiseComplaint(req));
+  return request("POST", "/api/cou/complaints", req);
+}
+
+/** `GET /api/cou/complaints`: the customer's tickets with live status from NBBL, newest first. */
+export function getCouComplaints(): Promise<CouComplaint[]> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureCouComplaints());
+  return request("GET", "/api/cou/complaints");
 }
 
 // ─── NBBL (switch) ───────────────────────────────────────────────────────────
@@ -168,6 +200,35 @@ export function getNbblTransaction(ref: string): Promise<NbblTxnDetail> {
 export function getNbblStats(): Promise<NbblStats> {
   if (USE_FIXTURES) return fixture(() => fx.fixtureStats());
   return request("GET", "/api/nbbl/stats");
+}
+
+/** `GET /api/nbbl/complaints?status=&pendingWith=` (newest first) */
+export function getNbblComplaints(query?: NbblComplaintQuery): Promise<NbblComplaint[]> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureNbblComplaints(query));
+  return request("GET", `/api/nbbl/complaints${qs({ status: query?.status, pendingWith: query?.pendingWith })}`);
+}
+
+/** `GET /api/nbbl/complaints/stats` */
+export function getNbblComplaintStats(): Promise<NbblComplaintStats> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureComplaintStats());
+  return request("GET", "/api/nbbl/complaints/stats");
+}
+
+/** `GET /api/nbbl/complaints/:id` (404 → ApiError NOT_FOUND) */
+export function getNbblComplaint(complaintId: string): Promise<NbblComplaintDetail> {
+  if (USE_FIXTURES) {
+    return fixture(() => fx.fixtureNbblComplaint(complaintId), true) as Promise<NbblComplaintDetail>;
+  }
+  return request("GET", `/api/nbbl/complaints/${encodeURIComponent(complaintId)}`);
+}
+
+/**
+ * `POST /api/nbbl/complaints/:id/actions` → fresh detail. Errors (ApiError): 400 BAD_REQUEST,
+ * 404 NOT_FOUND, 409 INVALID_TRANSITION (e.g. CLOSE a closed complaint, ASSIGN to the current party).
+ */
+export function nbblComplaintAction(complaintId: string, req: ComplaintActionRequest): Promise<NbblComplaintDetail> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureComplaintAction(complaintId, req));
+  return request("POST", `/api/nbbl/complaints/${encodeURIComponent(complaintId)}/actions`, req);
 }
 
 // ─── Biller ──────────────────────────────────────────────────────────────────

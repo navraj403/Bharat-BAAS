@@ -1,5 +1,41 @@
 # Agent F: Foundation
 
+## Phase C: Complaints
+
+**Model:** Opus · **Phase:** P0 (complaints contract) · **State:** DONE
+
+### Working on
+- nothing (handed back to PM)
+
+### Done
+- types.ts: additive complaint types, DTOs, label maps (COMPLAINT_REASON_LABELS, COMPLAINT_PARTY_LABELS, COMPLAINT_RESOLUTION_LABELS)
+- src/lib/domain/complaints.ts: SLA_DAYS/slaDays/dueAt/isOverdue, initialAssignee, pendingWithLabel, canTransition/applyAction,
+  summariseComplaints, newCouTicketNo/newComplaintId, input guards, error classes (400/404/409) + 16 Vitest cases
+- supabase/migrations/0002_complaints.sql (nbbl_complaints, nbbl_complaint_events, cou_complaints; idempotent)
+- tables.ts whitelist + scripts/db-verify.mjs; seed-sql.test now checks every migration file
+- seed.sql: truncate + Riya FAILED order DP-SEED000002 + overdue Meera ticket CCSEED000001 / DPT-SEED0001 (RAISED + ASSIGNED); db:gen-seed run
+- Stubs (NotImplemented) in parties/nbbl/api.ts (raiseComplaint, listComplaints, getComplaint, complaintAction, complaintStats;
+  re-exports Complaint* errors) and parties/cou/api.ts (listOrders, raiseComplaint, listComplaints)
+- client/api.ts: getCouOrders, raiseCouComplaint, getCouComplaints, getNbblComplaints, getNbblComplaintStats, getNbblComplaint,
+  nbblComplaintAction; fixture() maps ComplaintError → ApiError with the real status/code
+- fixtures.ts: 4 orders (2 FAILED), 4 complaints (OPEN COU/NBBL/BILLER incl. overdue, 1 CLOSED), stateful raise + actions; reset restores
+- ownership.json: F += src/lib/domain/complaints.ts, complaints.test.ts
+- npm run check green (48 tests); check-ownership F clean
+
+### Pending
+- none (C fills the stubs; PM runs db:migrate + db:seed)
+
+### Files touched
+- docs/agents/F.md, docs/agents/ownership.json, src/lib/domain/{types,complaints,complaints.test}.ts,
+  supabase/migrations/0002_complaints.sql, supabase/seed.sql, src/lib/db/{tables,seed-sql.generated,seed-sql.test}.ts,
+  scripts/db-verify.mjs, src/lib/parties/{nbbl,cou}/api.ts, src/lib/client/{api,fixtures,fixtures.test}.ts
+
+### Contract questions
+- RESOLVED by PM: Meera's seeded payment moved to 4 days 2 hours ago so the ticket (4 days ago) follows it.
+- CouComplaint.description is the COU's copy; NBBL keeps its own.
+
+---
+
 **Model:** Opus · **Phase:** P0 · **State:** DONE
 **Last update:** 15:30 (end of P0)
 

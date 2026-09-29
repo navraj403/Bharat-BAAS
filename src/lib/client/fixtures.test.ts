@@ -1,10 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { ComplaintNotFoundError, ComplaintTransitionError } from "@/lib/domain/complaints";
 import {
   fixtureAddTrip,
   fixtureBillerOverview,
+  fixtureComplaintAction,
+  fixtureComplaintStats,
+  fixtureCouComplaints,
   fixtureFetch,
   fixtureGenerateBills,
+  fixtureNbblComplaint,
+  fixtureNbblComplaints,
+  fixtureOrders,
   fixturePay,
+  fixtureRaiseComplaint,
   fixtureReset,
   fixtureStats,
   fixtureTransaction,
@@ -93,5 +101,48 @@ describe("fixtures reproduce BUILD_PLAN §4", () => {
     expect(df.kpis.receivablesDuePaise).toBe(672600 + 1188962);
     expect(df.kpis.overdueCount).toBe(1);
     expect(fixtureBillerOverview("volt-leasing").kpis.collectedPaise).toBe(1218350);
+  });
+});
+
+describe("fixture complaints (docs/COMPLAINTS_PLAN.md)", () => {
+  beforeEach(() => fixtureReset());
+
+  it("seeds orders incl. Riya's FAILED DP-SEED000002 and tickets for every party", () => {
+    const orders = fixtureOrders();
+    expect(orders.length).toBeGreaterThanOrEqual(3);
+    expect(orders.find((o) => o.orderId === "DP-SEED000002")).toMatchObject({
+      status: "FAILED", bbpsTxnRef: null, billerName: "Bajaj Finance", amountPaise: 672600,
+    });
+    const all = fixtureNbblComplaints();
+    expect(new Set(all.filter((c) => c.status === "OPEN").map((c) => c.pendingWith))).toEqual(new Set(["COU", "NBBL", "BILLER"]));
+    expect(all.find((c) => c.complaintId === "CCSEED000001")).toMatchObject({ pendingWith: "BILLER", overdue: true });
+    expect(all.some((c) => c.status === "CLOSED")).toBe(true);
+    const stats = fixtureComplaintStats();
+    expect(stats.total).toBe(all.length);
+    expect(stats.overdue).toBeGreaterThanOrEqual(1);
+    expect(fixtureCouComplaints()).toHaveLength(all.length);
+  });
+
+  it("raise on the failed order → pending with COU; idempotent; assign → close → COU sees CLOSED; 409 on re-close", () => {
+    const t = fixtureRaiseComplaint({ orderId: "DP-SEED000002", reason: "DEBITED_TXN_FAILED", description: " debited " });
+    expect(t).toMatchObject({ status: "OPEN", pendingWith: "COU", description: "debited", overdue: false, bbpsTxnRef: null });
+    expect(t.ticketNo).toMatch(/^DPT-[A-Z0-9]{8}$/);
+    expect(t.complaintId).toMatch(/^CC[A-Z0-9]{10}$/);
+    expect(fixtureRaiseComplaint({ orderId: "DP-SEED000002", reason: "DEBITED_TXN_FAILED" }).ticketNo).toBe(t.ticketNo);
+
+    const assigned = fixtureComplaintAction(t.complaintId, { action: "ASSIGN", assignTo: "BILLER" });
+    expect(assigned.pendingWith).toBe("BILLER");
+    const closed = fixtureComplaintAction(t.complaintId, { action: "CLOSE", resolution: "REFUNDED", note: "Reversed" });
+    expect(closed).toMatchObject({ status: "CLOSED", resolution: "REFUNDED" });
+    expect(closed.events.map((e) => e.action)).toEqual(["RAISED", "ASSIGNED", "ASSIGNED", "CLOSED"]);
+    expect(fixtureCouComplaints().find((c) => c.ticketNo === t.ticketNo)?.status).toBe("CLOSED");
+    expect(() => fixtureComplaintAction(t.complaintId, { action: "CLOSE", resolution: "RESOLVED" })).toThrow(ComplaintTransitionError);
+  });
+
+  it("links the PAY txn on the detail; unknown ids → null / not found", () => {
+    expect(fixtureNbblComplaint("CCSEED000001")?.linkedTxn?.ref).toBe("BCSEEDPAID01");
+    expect(fixtureNbblComplaint("CCNOPE000000")).toBeNull();
+    expect(() => fixtureComplaintAction("CCNOPE000000", { action: "NOTE", note: "x" })).toThrow(ComplaintNotFoundError);
+    expect(() => fixtureRaiseComplaint({ orderId: "DP-NOPE", reason: "OTHER" })).toThrow(ComplaintNotFoundError);
   });
 });

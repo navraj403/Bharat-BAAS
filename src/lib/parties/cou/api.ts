@@ -7,10 +7,13 @@ import { sql } from "@/lib/db/client";
 import type {
   BillerSummary,
   Category,
+  CouComplaint,
   CouFetchRequest,
+  CouOrder,
   CouPayRequest,
   FetchResult,
   PayResult,
+  RaiseComplaintRequest,
 } from "@/lib/domain/types";
 import * as nbbl from "@/lib/parties/nbbl/api";
 import { newOrderId, normaliseVehicleNo } from "./util";
@@ -114,4 +117,35 @@ export async function pay(req: CouPayRequest): Promise<PayResult> {
     bbpsTxnRef: res.bbpsTxnRef,
     message: res.message,
   };
+}
+
+// ─── Complaints (Phase C, docs/COMPLAINTS_PLAN.md). STUBS: agent C implements. ───────────
+//
+// Table: cou_complaints (supabase/migrations/0002_complaints.sql). Status, pending-with and
+// timeline live at NBBL: read them through nbbl.listComplaints({ couId: COU_ID }).
+// Errors: the Complaint* classes from src/lib/domain/complaints.ts (re-exported by nbbl/api):
+// ComplaintInputError → 400, ComplaintNotFoundError → 404 (unknown orderId).
+
+/**
+ * `GET /api/cou/orders`. Every cou_payments row (single demo user), newest first, with
+ * billerName resolved via nbbl.listBillers (null when unknown).
+ */
+export async function listOrders(): Promise<CouOrder[]> {
+  throw new Error("NotImplemented");
+}
+
+/**
+ * `POST /api/cou/complaints`. Validates reason/description (400), loads the order (404 if unknown),
+ * generates a ticket no (complaints.newCouTicketNo), calls nbbl.raiseComplaint, and inserts
+ * cou_complaints. Idempotent: if NBBL returns an existing OPEN complaint, returns the existing COU
+ * ticket for it (no new row). Returns the merged ticket.
+ */
+export async function raiseComplaint(req: RaiseComplaintRequest): Promise<CouComplaint> {
+  void req;
+  throw new Error("NotImplemented");
+}
+
+/** `GET /api/cou/complaints`. COU tickets, newest first, merged with live NBBL status. */
+export async function listComplaints(): Promise<CouComplaint[]> {
+  throw new Error("NotImplemented");
 }

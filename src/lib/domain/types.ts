@@ -641,3 +641,228 @@ export interface ResetResponse {
 export interface ApiErrorBody {
   error: { code: string; message: string };
 }
+
+// ─── Complaints (Phase C, docs/COMPLAINTS_PLAN.md) ───────────────────────────
+//
+// A customer raises a complaint in the COU (DemoPay) against one of their orders (a
+// `cou_payments` row). The COU keeps a ticket (`DPT-` + 8 [A-Z0-9]) and NBBL opens a BBPS
+// complaint (`CC` + 10 [A-Z0-9]). NBBL is the system of record for status, assignee
+// ("pending with") and the timeline. Pure rules (SLA, triage, transitions) live in
+// src/lib/domain/complaints.ts.
+
+/** Why the customer is complaining. */
+export type ComplaintReason =
+  | "DUPLICATE_PAYMENT"
+  | "DEBITED_TXN_FAILED"
+  | "PAID_BILL_PENDING"
+  | "WRONG_AMOUNT"
+  | "OTHER";
+
+/** Runtime list of every `ComplaintReason`, in the order the COU shows them. */
+export const COMPLAINT_REASONS: readonly ComplaintReason[] = [
+  "DEBITED_TXN_FAILED",
+  "PAID_BILL_PENDING",
+  "DUPLICATE_PAYMENT",
+  "WRONG_AMOUNT",
+  "OTHER",
+];
+
+/** Customer-facing labels (COU radios, NBBL table). */
+export const COMPLAINT_REASON_LABELS: Record<ComplaintReason, string> = {
+  DUPLICATE_PAYMENT: "Duplicate payment",
+  DEBITED_TXN_FAILED: "Payment deducted but transaction failed",
+  PAID_BILL_PENDING: "Payment successful but bill still pending",
+  WRONG_AMOUNT: "Wrong amount charged",
+  OTHER: "Something else",
+};
+
+/** Ticket status. */
+export type ComplaintStatus = "OPEN" | "CLOSED";
+export const COMPLAINT_STATUSES: readonly ComplaintStatus[] = ["OPEN", "CLOSED"];
+
+/** The party a complaint is currently pending with. */
+export type ComplaintParty = "COU" | "NBBL" | "BILLER";
+export const COMPLAINT_PARTIES: readonly ComplaintParty[] = ["COU", "NBBL", "BILLER"];
+
+/**
+ * Generic labels. For BILLER, prefer the complaint's `billerName` ("Pending with Bajaj Finance")
+ * and fall back to this label only when `billerName` is null.
+ */
+export const COMPLAINT_PARTY_LABELS: Record<ComplaintParty, string> = {
+  COU: "DemoPay",
+  NBBL: "Bharat Connect",
+  BILLER: "Biller",
+};
+
+/** How a CLOSED complaint was resolved. */
+export type ComplaintResolution = "RESOLVED" | "REJECTED" | "REFUNDED";
+export const COMPLAINT_RESOLUTIONS: readonly ComplaintResolution[] = ["RESOLVED", "REJECTED", "REFUNDED"];
+export const COMPLAINT_RESOLUTION_LABELS: Record<ComplaintResolution, string> = {
+  RESOLVED: "Resolved",
+  REJECTED: "Rejected",
+  REFUNDED: "Refunded",
+};
+
+/** Timeline event kinds (`nbbl_complaint_events.action`). */
+export type ComplaintActionKind = "RAISED" | "ASSIGNED" | "NOTE" | "CLOSED" | "REOPENED";
+
+/** What an NBBL operator can do to a complaint (`POST /api/nbbl/complaints/:id/actions`). */
+export type ComplaintActionType = "ASSIGN" | "NOTE" | "CLOSE" | "REOPEN";
+export const COMPLAINT_ACTION_TYPES: readonly ComplaintActionType[] = ["ASSIGN", "NOTE", "CLOSE", "REOPEN"];
+
+/** One COU order (a `cou_payments` row) the customer can complain about. `GET /api/cou/orders`. */
+export interface CouOrder {
+  /** `DP-` + 10 [A-Z0-9] (seed: `DP-SEED00000n`). */
+  orderId: string;
+  fetchRef: string;
+  /** Null when NBBL never issued a PAY ref (e.g. mock UPI declined). */
+  bbpsTxnRef: string | null;
+  /** Null when the COU never learnt it (only filled on success unless seeded). */
+  billerId: string | null;
+  /** Resolved from the NBBL registry; null when billerId is null or unknown. */
+  billerName: string | null;
+  vehicleRegNo: string | null;
+  amountPaise: Paise;
+  mode: PaymentMode;
+  status: CouPaymentStatus;
+  createdAt: IsoDateTime;
+}
+
+/** Customer app → COU: `POST /api/cou/complaints`. */
+export interface RaiseComplaintRequest {
+  orderId: string;
+  reason: ComplaintReason;
+  /** Optional free text, max 280 chars (`COMPLAINT_DESCRIPTION_MAX`). */
+  description?: string;
+}
+
+/**
+ * A ticket as the customer sees it (`POST`/`GET /api/cou/complaints`): the COU's own row
+ * merged with live status from NBBL. `overdue` = OPEN and now > dueAt.
+ */
+export interface CouComplaint {
+  /** COU ticket `DPT-` + 8 [A-Z0-9]. */
+  ticketNo: string;
+  /** NBBL (BBPS) complaint id `CC` + 10 [A-Z0-9]. */
+  complaintId: string;
+  // Order summary
+  orderId: string;
+  bbpsTxnRef: string | null;
+  billerId: string | null;
+  billerName: string | null;
+  vehicleRegNo: string | null;
+  amountPaise: Paise;
+  // Complaint
+  reason: ComplaintReason;
+  description: string | null;
+  status: ComplaintStatus;
+  pendingWith: ComplaintParty;
+  resolution: ComplaintResolution | null;
+  dueAt: IsoDateTime;
+  overdue: boolean;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+  closedAt: IsoDateTime | null;
+}
+
+/** A BBPS complaint at NBBL (`GET /api/nbbl/complaints`). Customer refs are masked only. */
+export interface NbblComplaint {
+  /** `CC` + 10 [A-Z0-9]. */
+  complaintId: string;
+  couId: string;
+  couTicketNo: string;
+  /** The COU order id the complaint is about. */
+  orderId: string;
+  /** The PAY txn (bbpsTxnRef) it is about; null when NBBL never saw a payment. */
+  txnRef: string | null;
+  billerId: string | null;
+  billerName: string | null;
+  /** From the linked PAY txn (`MH01AB1003 / 98XXXXXX03`), else the vehicle reg no, else null. */
+  customerRefMasked: string | null;
+  amountPaise: Paise;
+  reason: ComplaintReason;
+  description: string | null;
+  status: ComplaintStatus;
+  pendingWith: ComplaintParty;
+  resolution: ComplaintResolution | null;
+  /** createdAt + SLA days for the reason (see complaints.ts `dueAt`). */
+  dueAt: IsoDateTime;
+  /** Derived at read time: OPEN and now > dueAt. */
+  overdue: boolean;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+  closedAt: IsoDateTime | null;
+}
+
+/** One entry on a complaint's timeline (`nbbl_complaint_events`). */
+export interface NbblComplaintEvent {
+  id: number;
+  complaintId: string;
+  action: ComplaintActionKind;
+  /** ASSIGNED: previous party (null on the initial triage). CLOSED: the party it was pending with. Else null. */
+  fromParty: ComplaintParty | null;
+  /** ASSIGNED: new party. REOPENED: NBBL. Else null. */
+  toParty: ComplaintParty | null;
+  /** `DEMOPAY` (the COU id) for RAISED, `SYSTEM` for auto-triage, `NBBL_OPS` for console actions. */
+  actor: string;
+  note: string | null;
+  at: IsoDateTime;
+}
+
+/** `GET /api/nbbl/complaints/:id`. Events oldest first; linkedTxn = the PAY txn at txnRef, if any. */
+export type NbblComplaintDetail = NbblComplaint & {
+  events: NbblComplaintEvent[];
+  linkedTxn: NbblTxn | null;
+};
+
+/** `GET /api/nbbl/complaints?status=&pendingWith=`. Newest first. */
+export interface NbblComplaintQuery {
+  status?: ComplaintStatus;
+  pendingWith?: ComplaintParty;
+}
+
+/**
+ * NBBL console → `POST /api/nbbl/complaints/:id/actions`.
+ * - ASSIGN: needs `assignTo` (≠ current pendingWith); OPEN only.
+ * - NOTE:   needs a non-empty `note`; any status.
+ * - CLOSE:  needs `resolution`; OPEN only; optional `note`.
+ * - REOPEN: CLOSED only; resets pendingWith to NBBL; optional `note`.
+ * Invalid transition → 409 `INVALID_TRANSITION`; missing/invalid field → 400 `BAD_REQUEST`.
+ */
+export interface ComplaintActionRequest {
+  action: ComplaintActionType;
+  assignTo?: ComplaintParty;
+  resolution?: ComplaintResolution;
+  /** Max 500 chars (`COMPLAINT_NOTE_MAX`). */
+  note?: string;
+  /** Defaults to `NBBL_OPS`. */
+  actor?: string;
+}
+
+/** `GET /api/nbbl/complaints/stats`. `byParty` counts OPEN complaints only. */
+export interface NbblComplaintStats {
+  total: number;
+  open: number;
+  /** OPEN and past dueAt. */
+  overdue: number;
+  closed: number;
+  byParty: Record<ComplaintParty, number>;
+}
+
+/**
+ * COU → NBBL (server-side, `nbbl/api.raiseComplaint`). The COU sends what it knows about the
+ * order; NBBL looks up the PAY txn by `bbpsTxnRef`, masks the customer, triages and sets the SLA.
+ * Idempotent: an OPEN complaint for the same (couId, orderId, reason) is returned as is.
+ */
+export interface NbblRaiseComplaintRequest {
+  couId: string;
+  /** The COU ticket number (`DPT-…`) the COU generated for this complaint. */
+  couTicketNo: string;
+  orderId: string;
+  bbpsTxnRef: string | null;
+  billerId: string | null;
+  vehicleRegNo: string | null;
+  amountPaise: Paise;
+  reason: ComplaintReason;
+  description?: string;
+}

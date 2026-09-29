@@ -26,11 +26,21 @@ import type {
   BillerOverview,
   BillerSummary,
   Category,
+  ComplaintActionRequest,
+  ComplaintParty,
+  ComplaintReason,
+  CouComplaint,
   CouFetchRequest,
+  CouOrder,
   CouPayRequest,
   Cycle,
   FetchResult,
   JsonValue,
+  NbblComplaint,
+  NbblComplaintDetail,
+  NbblComplaintEvent,
+  NbblComplaintQuery,
+  NbblComplaintStats,
   NbblEvent,
   NbblEventStep,
   NbblStats,
@@ -44,6 +54,7 @@ import type {
   PayResult,
   PaymentMode,
   PresentedCycle,
+  RaiseComplaintRequest,
   Receipt,
   ResponseCode,
 } from "@/lib/domain/types";
@@ -52,6 +63,22 @@ import { formatCycle } from "@/lib/domain/cycle";
 import { formatINR } from "@/lib/domain/money";
 // ASSUMPTION constants (GST 18%, late fee 2%, due +10 days) are defined and tagged once, in billing.ts.
 import { DUE_DAYS, GST_BPS, LATE_FEE_BPS } from "@/lib/domain/billing";
+import {
+  ACTOR_SYSTEM,
+  ComplaintInputError,
+  ComplaintNotFoundError,
+  applyAction,
+  dueAt as complaintDueAt,
+  initialAssignee,
+  isComplaintParty,
+  isComplaintReason,
+  isComplaintStatus,
+  isOverdue as isComplaintOverdue,
+  newComplaintId,
+  newCouTicketNo,
+  normaliseDescription,
+  summariseComplaints,
+} from "@/lib/domain/complaints";
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
@@ -172,6 +199,16 @@ interface FxCouPayment {
   createdAt: string;
   updatedAt: string;
 }
+/** NBBL complaint row (overdue is derived at read time). */
+type FxComplaint = Omit<NbblComplaint, "overdue">;
+interface FxCouComplaint {
+  ticketNo: string;
+  orderId: string;
+  complaintId: string;
+  reason: ComplaintReason;
+  description: string | null;
+  createdAt: string;
+}
 interface Store {
   plans: OemPlan[];
   vehicles: FxVehicle[];
@@ -185,6 +222,10 @@ interface Store {
   events: NbblEvent[];
   couPayments: FxCouPayment[];
   nextEventId: number;
+  complaints: FxComplaint[];
+  complaintEvents: NbblComplaintEvent[];
+  couComplaints: FxCouComplaint[];
+  nextComplaintEventId: number;
 }
 
 const PLANS: OemPlan[] = [
@@ -294,6 +335,10 @@ function seedStore(): Store {
     events: [],
     couPayments: [],
     nextEventId: 1,
+    complaints: [],
+    complaintEvents: [],
+    couComplaints: [],
+    nextComplaintEventId: 1,
   };
 
   // Meera: paid presentment + payment + NBBL FETCH/PAY + COU order (AutoPay), as in seed.sql.
@@ -367,6 +412,7 @@ function seedStore(): Store {
       });
     });
   }
+  seedComplaints(store, now);
   return store;
 }
 
@@ -745,6 +791,238 @@ export function fixtureBills(regNo?: string): OemBill[] {
   return [...store.bills].sort((a, b) => b.cycle.localeCompare(a.cycle) || a.regNo.localeCompare(b.regNo));
 }
 
+// ─── Complaints (Phase C) ────────────────────────────────────────────────────
+//
+// Fixture mirror of cou/api (orders, tickets) + nbbl/api (complaints, actions, stats), using the
+// same pure rules (src/lib/domain/complaints.ts). Errors are the Complaint* classes, which the
+// client's fixture() wrapper maps to ApiError with the same status/code as the real routes.
+
+/**
+ * Orders + complaints. DP-SEED000002 and CCSEED000001 mirror supabase/seed.sql; the rest are
+ * fixture-only so every "pending with" party, OPEN/CLOSED and overdue show up in the UIs:
+ *   DP-SEED000001 Meera SUCCESS (seed)             CCSEED000001 PAID_BILL_PENDING  BILLER OPEN, overdue (seed)
+ *                                                  CCFX00000004 DUPLICATE_PAYMENT  BILLER CLOSED (REJECTED)
+ *   DP-SEED000002 Riya  FAILED, no bbps ref (seed) CCFX00000003 OTHER              COU    OPEN (NBBL → COU)
+ *   DP-FX00000003 Arjun FAILED, PAY BPR001         CCFX00000002 DEBITED_TXN_FAILED NBBL   OPEN
+ * Raising DEBITED_TXN_FAILED on DP-SEED000002 → pending with COU (DemoPay).
+ */
+function seedComplaints(s: Store, now: number): void {
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+  const H = 3_600_000;
+  s.couPayments.push(
+    {
+      id: uuid(), orderId: "DP-SEED000002", fetchRef: "F-SEED000002", bbpsTxnRef: null, billerId: "bajaj-finance",
+      vehicleRegNo: "MH01AB1001", amountPaise: 672600, mode: "UPI", status: "FAILED",
+      createdAt: ago(DAY_MS), updatedAt: ago(DAY_MS - 3000),
+    },
+    {
+      id: uuid(), orderId: "DP-FX00000003", fetchRef: "F-R3T8W2NB6C", bbpsTxnRef: "BCFXFAILED03", billerId: "bajaj-finance",
+      vehicleRegNo: "MH01AB1002", amountPaise: 1188962, mode: "NETBANKING", status: "FAILED",
+      createdAt: ago(DAY_MS), updatedAt: ago(DAY_MS - 300),
+    },
+  );
+  // Arjun's rejected PAY (amount mismatch) at NBBL, so its complaint links a FAILED txn.
+  const payAt = now - DAY_MS;
+  s.txns.push({
+    ref: "BCFXFAILED03", type: "PAY", couId: "DEMOPAY", billerId: "bajaj-finance", category: "EV_BAAS",
+    customerRefMasked: "MH01AB1002 / 98XXXXXX02", amountPaise: 1188962, status: "FAILED", responseCode: "BPR001",
+    fetchRef: "F-R3T8W2NB6C", billerRef: null, createdAt: new Date(payAt).toISOString(),
+    completedAt: new Date(payAt + 210).toISOString(), latencyMs: 210,
+  });
+  const paySteps: Array<[NbblEventStep, JsonValue]> = [
+    ["COU_REQ", { initiatedBy: "CUSTOMER", couId: "DEMOPAY", fetchRef: "F-R3T8W2NB6C", amountPaise: 1188962, mode: "NETBANKING", couOrderId: "DP-FX00000003" }],
+    ["PAY_REQ", { billerId: "bajaj-finance", amountPaise: 1188962, bbpsTxnRef: "BCFXFAILED03", mode: "NETBANKING" }],
+    ["ADVICE_ACK", { ack: false, responseCode: "BPR001", bbpsTxnRef: "BCFXFAILED03" }],
+    ["COU_RESP", { status: "FAILED", responseCode: "BPR001", bbpsTxnRef: "BCFXFAILED03" }],
+  ];
+  paySteps.forEach(([step, payload], i) => {
+    s.events.push({ id: s.nextEventId++, txnRef: "BCFXFAILED03", step, payload, at: new Date(payAt + 70 * i).toISOString() });
+  });
+
+  type Ev = [NbblComplaintEvent["action"], ComplaintParty | null, ComplaintParty | null, string, string | null, number];
+  const add = (c: Omit<FxComplaint, "dueAt" | "updatedAt">, events: Ev[]) => {
+    const evs = events.map(([action, fromParty, toParty, actor, note, atMs]): NbblComplaintEvent => ({
+      id: s.nextComplaintEventId++, complaintId: c.complaintId, action, fromParty, toParty, actor, note, at: ago(atMs),
+    }));
+    s.complaints.push({ ...c, dueAt: complaintDueAt(c.createdAt, c.reason), updatedAt: evs[evs.length - 1].at });
+    s.complaintEvents.push(...evs);
+    s.couComplaints.push({
+      ticketNo: c.couTicketNo, orderId: c.orderId, complaintId: c.complaintId, reason: c.reason,
+      description: c.description, createdAt: c.createdAt,
+    });
+  };
+  const meeraDesc = "Paid through AutoPay but the biller still shows the bill as due.";
+  add(
+    {
+      complaintId: "CCSEED000001", couId: "DEMOPAY", couTicketNo: "DPT-SEED0001", orderId: "DP-SEED000001",
+      txnRef: "BCSEEDPAID01", billerId: "volt-leasing", billerName: "Volt Leasing", customerRefMasked: "MH01AB1003 / 98XXXXXX03",
+      amountPaise: 1218350, reason: "PAID_BILL_PENDING", description: meeraDesc, status: "OPEN", pendingWith: "BILLER",
+      resolution: null, createdAt: ago(4 * DAY_MS), closedAt: null,
+    },
+    [
+      ["RAISED", null, null, "DEMOPAY", meeraDesc, 4 * DAY_MS],
+      ["ASSIGNED", null, "BILLER", ACTOR_SYSTEM, "Auto-triage: paid bill not posted, pending with the biller.", 4 * DAY_MS - 1000],
+    ],
+  );
+  add(
+    {
+      complaintId: "CCFX00000002", couId: "DEMOPAY", couTicketNo: "DPT-FX000002", orderId: "DP-FX00000003",
+      txnRef: "BCFXFAILED03", billerId: "bajaj-finance", billerName: "Bajaj Finance", customerRefMasked: "MH01AB1002 / 98XXXXXX02",
+      amountPaise: 1188962, reason: "DEBITED_TXN_FAILED", description: "Money left my account but the payment shows failed.",
+      status: "OPEN", pendingWith: "NBBL", resolution: null, createdAt: ago(6 * H), closedAt: null,
+    },
+    [
+      ["RAISED", null, null, "DEMOPAY", "Money left my account but the payment shows failed.", 6 * H],
+      ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, "Auto-triage: the PAY failed at the switch.", 6 * H - 1000],
+    ],
+  );
+  add(
+    {
+      complaintId: "CCFX00000003", couId: "DEMOPAY", couTicketNo: "DPT-FX000003", orderId: "DP-SEED000002",
+      txnRef: null, billerId: "bajaj-finance", billerName: "Bajaj Finance", customerRefMasked: "MH01AB1001",
+      amountPaise: 672600, reason: "OTHER", description: "The app showed an error while paying.",
+      status: "OPEN", pendingWith: "COU", resolution: null, createdAt: ago(20 * H), closedAt: null,
+    },
+    [
+      ["RAISED", null, null, "DEMOPAY", "The app showed an error while paying.", 20 * H],
+      ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, "Auto-triage: other, pending with Bharat Connect.", 20 * H - 1000],
+      ["ASSIGNED", "NBBL", "COU", "NBBL_OPS", "No PAY reached the switch; DemoPay to check the UPI leg.", 18 * H],
+    ],
+  );
+  add(
+    {
+      complaintId: "CCFX00000004", couId: "DEMOPAY", couTicketNo: "DPT-FX000004", orderId: "DP-SEED000001",
+      txnRef: "BCSEEDPAID01", billerId: "volt-leasing", billerName: "Volt Leasing", customerRefMasked: "MH01AB1003 / 98XXXXXX03",
+      amountPaise: 1218350, reason: "DUPLICATE_PAYMENT", description: null,
+      status: "CLOSED", pendingWith: "BILLER", resolution: "REJECTED", createdAt: ago(2.5 * DAY_MS), closedAt: ago(DAY_MS),
+    },
+    [
+      ["RAISED", null, null, "DEMOPAY", null, 2.5 * DAY_MS],
+      ["ASSIGNED", null, "BILLER", ACTOR_SYSTEM, "Auto-triage: duplicate payment, pending with the biller.", 2.5 * DAY_MS - 1000],
+      ["NOTE", null, null, "NBBL_OPS", "Volt Leasing confirms a single credit for BCSEEDPAID01.", 1.5 * DAY_MS],
+      ["CLOSED", "BILLER", null, "NBBL_OPS", "Only one debit found; no duplicate.", DAY_MS],
+    ],
+  );
+}
+
+const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
+
+function orderView(o: FxCouPayment): CouOrder {
+  const biller = o.billerId ? store.billers.find((b) => b.id === o.billerId) : undefined;
+  return {
+    orderId: o.orderId, fetchRef: o.fetchRef, bbpsTxnRef: o.bbpsTxnRef, billerId: o.billerId,
+    billerName: biller?.name ?? null, vehicleRegNo: o.vehicleRegNo, amountPaise: o.amountPaise, mode: o.mode,
+    status: o.status, createdAt: o.createdAt,
+  };
+}
+
+function nbblView(c: FxComplaint): NbblComplaint {
+  return { ...c, overdue: isComplaintOverdue(c) };
+}
+
+function couView(t: FxCouComplaint): CouComplaint {
+  const c = store.complaints.find((x) => x.complaintId === t.complaintId);
+  if (!c) throw new ComplaintNotFoundError(`Complaint ${t.complaintId} not found`);
+  const o = store.couPayments.find((x) => x.orderId === t.orderId);
+  return {
+    ticketNo: t.ticketNo, complaintId: c.complaintId, orderId: t.orderId,
+    bbpsTxnRef: o?.bbpsTxnRef ?? c.txnRef, billerId: c.billerId, billerName: c.billerName,
+    vehicleRegNo: o?.vehicleRegNo ?? null, amountPaise: c.amountPaise, reason: t.reason, description: t.description,
+    status: c.status, pendingWith: c.pendingWith, resolution: c.resolution, dueAt: c.dueAt,
+    overdue: isComplaintOverdue(c), createdAt: t.createdAt, updatedAt: c.updatedAt, closedAt: c.closedAt,
+  };
+}
+
+function complaintDetail(c: FxComplaint): NbblComplaintDetail {
+  return {
+    ...nbblView(c),
+    events: store.complaintEvents.filter((e) => e.complaintId === c.complaintId).sort((a, b) => a.id - b.id),
+    linkedTxn: (c.txnRef && store.txns.find((t) => t.ref === c.txnRef && t.type === "PAY")) || null,
+  };
+}
+
+/** `GET /api/cou/orders` */
+export function fixtureOrders(): CouOrder[] {
+  return [...store.couPayments].sort(byNewest).map(orderView);
+}
+
+/** `POST /api/cou/complaints` (COU + NBBL raise in one step). Idempotent per OPEN (order, reason). */
+export function fixtureRaiseComplaint(req: RaiseComplaintRequest): CouComplaint {
+  if (!isComplaintReason(req?.reason)) throw new ComplaintInputError("reason is not a valid complaint reason");
+  const description = normaliseDescription(req.description);
+  const order = store.couPayments.find((o) => o.orderId === req.orderId);
+  if (!order) throw new ComplaintNotFoundError(`Order ${String(req.orderId)} not found`);
+
+  const existing = store.complaints.find(
+    (c) => c.couId === "DEMOPAY" && c.orderId === order.orderId && c.reason === req.reason && c.status === "OPEN",
+  );
+  if (existing) {
+    const ticket = store.couComplaints.find((t) => t.complaintId === existing.complaintId);
+    if (ticket) return couView(ticket);
+  }
+
+  const payTxn = order.bbpsTxnRef ? store.txns.find((t) => t.ref === order.bbpsTxnRef && t.type === "PAY") : undefined;
+  const pendingWith = initialAssignee(req.reason, payTxn?.status ?? null);
+  const biller = order.billerId ? store.billers.find((b) => b.id === order.billerId) : undefined;
+  const at = new Date().toISOString();
+  const c: FxComplaint = {
+    complaintId: newComplaintId(), couId: "DEMOPAY", couTicketNo: newCouTicketNo(), orderId: order.orderId,
+    txnRef: payTxn?.ref ?? null, billerId: order.billerId, billerName: biller?.name ?? null,
+    customerRefMasked: payTxn?.customerRefMasked ?? order.vehicleRegNo ?? null, amountPaise: order.amountPaise,
+    reason: req.reason, description, status: "OPEN", pendingWith, resolution: null,
+    dueAt: complaintDueAt(at, req.reason), createdAt: at, updatedAt: at, closedAt: null,
+  };
+  store.complaints.push(c);
+  store.complaintEvents.push(
+    { id: store.nextComplaintEventId++, complaintId: c.complaintId, action: "RAISED", fromParty: null, toParty: null, actor: "DEMOPAY", note: description, at },
+    { id: store.nextComplaintEventId++, complaintId: c.complaintId, action: "ASSIGNED", fromParty: null, toParty: pendingWith, actor: ACTOR_SYSTEM, note: "Auto-triage", at },
+  );
+  const ticket: FxCouComplaint = {
+    ticketNo: c.couTicketNo, orderId: order.orderId, complaintId: c.complaintId, reason: req.reason, description, createdAt: at,
+  };
+  store.couComplaints.push(ticket);
+  return couView(ticket);
+}
+
+/** `GET /api/cou/complaints` */
+export function fixtureCouComplaints(): CouComplaint[] {
+  return [...store.couComplaints].sort(byNewest).map(couView);
+}
+
+/** `GET /api/nbbl/complaints?status=&pendingWith=` */
+export function fixtureNbblComplaints(query?: NbblComplaintQuery & { couId?: string }): NbblComplaint[] {
+  if (query?.status !== undefined && !isComplaintStatus(query.status)) throw new ComplaintInputError("status must be OPEN or CLOSED");
+  if (query?.pendingWith !== undefined && !isComplaintParty(query.pendingWith)) {
+    throw new ComplaintInputError("pendingWith must be COU, NBBL or BILLER");
+  }
+  return store.complaints
+    .filter((c) => (!query?.status || c.status === query.status) && (!query?.pendingWith || c.pendingWith === query.pendingWith))
+    .filter((c) => !query?.couId || c.couId === query.couId)
+    .sort(byNewest)
+    .map(nbblView);
+}
+
+/** `GET /api/nbbl/complaints/:id` (null → 404) */
+export function fixtureNbblComplaint(complaintId: string): NbblComplaintDetail | null {
+  const c = store.complaints.find((x) => x.complaintId === complaintId);
+  return c ? complaintDetail(c) : null;
+}
+
+/** `POST /api/nbbl/complaints/:id/actions`. Throws ComplaintNotFoundError / InputError / TransitionError. */
+export function fixtureComplaintAction(complaintId: string, req: ComplaintActionRequest): NbblComplaintDetail {
+  const c = store.complaints.find((x) => x.complaintId === complaintId);
+  if (!c) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);
+  const { next, event } = applyAction(c, req);
+  Object.assign(c, next, { updatedAt: event.at });
+  store.complaintEvents.push({ id: store.nextComplaintEventId++, complaintId, ...event });
+  return complaintDetail(c);
+}
+
+/** `GET /api/nbbl/complaints/stats` */
+export function fixtureComplaintStats(): NbblComplaintStats {
+  return summariseComplaints(store.complaints);
+}
+
 // ─── Admin ───────────────────────────────────────────────────────────────────
 
 function snake(key: string): string {
@@ -769,7 +1047,10 @@ const FIXTURE_TABLES: Array<{ party: Party; table: string; rows: () => object[] 
   { party: "nbbl", table: "nbbl_billers", rows: () => store.billers },
   { party: "nbbl", table: "nbbl_transactions", rows: () => fixtureTransactions({ limit: 100 }) },
   { party: "nbbl", table: "nbbl_events", rows: () => [...store.events].reverse() },
+  { party: "nbbl", table: "nbbl_complaints", rows: () => [...store.complaints].reverse() },
+  { party: "nbbl", table: "nbbl_complaint_events", rows: () => [...store.complaintEvents].reverse() },
   { party: "cou", table: "cou_payments", rows: () => [...store.couPayments].reverse() },
+  { party: "cou", table: "cou_complaints", rows: () => [...store.couComplaints].reverse() },
 ];
 
 export function fixtureAdminTables(): AdminTableSummary[] {
