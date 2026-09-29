@@ -17,7 +17,7 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat("en-IN").format(n);
 }
 
+/** `YYYY-MM` in UTC, matching the server's cycle boundary (DB `now()`, `toISOString`). */
 export function currentCycle(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return new Date().toISOString().slice(0, 7);
 }

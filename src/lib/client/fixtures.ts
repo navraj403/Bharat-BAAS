@@ -49,14 +49,13 @@ import type {
 } from "@/lib/domain/types";
 import { RESPONSE_MESSAGES } from "@/lib/domain/types";
 import { formatCycle } from "@/lib/domain/cycle";
+import { formatINR } from "@/lib/domain/money";
+// ASSUMPTION constants (GST 18%, late fee 2%, due +10 days) are defined and tagged once, in billing.ts.
+import { DUE_DAYS, GST_BPS, LATE_FEE_BPS } from "@/lib/domain/billing";
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
 const DAY_MS = 86_400_000;
-// Source of truth: src/lib/domain/billing.ts (GST_BPS / LATE_FEE_BPS); keep in sync.
-const GST_BPS = 1800; // ASSUMPTION: GST 18% (fixture mirror of billing.ts)
-const LATE_FEE_BPS = 200; // ASSUMPTION: late fee 2% of subtotal, once, no GST
-const DUE_DAYS = 10; // ASSUMPTION: due = bill date + 10 days
 
 /** Half-up percentage of a non-negative integer paise amount, in basis points. */
 function pctBps(paise: number, bps: number): number {
@@ -100,9 +99,7 @@ function maskName(name: string): string {
   const last = rest.join(" ");
   return last ? `${first} ${last[0]}****` : first;
 }
-function rupees(paise: number): string {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(paise / 100);
-}
+const rupees = formatINR;
 function randRef(prefix: string): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
   let s = "";
@@ -563,6 +560,12 @@ export function fixtureBillPay(req: { couId: string; fetchRef: string; amountPai
   const fetchTxn = store.txns.find((t) => t.ref === req.fetchRef && t.type === "FETCH");
   if (!fetchTxn || fetchTxn.responseCode !== "000" || !fetchTxn.billerRef) {
     return { status: "FAILED", bbpsTxnRef: null, receipt: null, responseCode: "BPR002", message: "This bill is not payable. Fetch the bill again." };
+  }
+  // Idempotency per fetchRef (mirrors nbbl/api.billPay): a retry returns the earlier receipt.
+  const priorTxn = store.txns.find((t) => t.type === "PAY" && t.fetchRef === req.fetchRef && t.status === "SUCCESS");
+  const priorPayment = priorTxn && store.payments.find((p) => p.bbpsTxnRef === priorTxn.ref);
+  if (priorTxn && priorPayment) {
+    return { status: "SUCCESS", bbpsTxnRef: priorTxn.ref, receipt: receiptFor(store, priorPayment, req.couOrderId), responseCode: "000", message: RESPONSE_MESSAGES["000"] };
   }
   const bbpsTxnRef = randRef("BC");
   const presentment = store.presentments.find((p) => p.id === fetchTxn.billerRef);

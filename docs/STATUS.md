@@ -29,6 +29,7 @@ All 5 were fixed by agent I (`777e468`, `1f05029`).
 - setup · Scaffolded Next.js 16 + TS + Tailwind v4 + Vitest; wrote AGENTS.md, CLAUDE.md, DOMAIN.md
 - setup · Moved the repo to C:\Interview-LC\bharat-baas; typecheck runs `next typegen` first
 - plan · Wrote docs/BUILD_PLAN.md v1 (4 parties, Supabase from the start, category → biller → details, arrears rolled into the latest bill, Vercel deploy) and aligned AGENTS.md and DOMAIN.md with it · next: user approval, then P0
+- post-G4 · Fixed R.md #7–#12: NBBL bill-pay is idempotent per fetchRef (a retry replays the advice under the same BC ref), post-ACK bookkeeping can't flip a collected payment to FAILED, biller sync repairs a missed OEM markPaid, UTC cycle in the consoles, simulateFailure only in demo mode plus fetchRef validation, formatINR plus a single source for the GST/late-fee constants. check 29/29, test:int 27/27, smoke 23/23 local · next: redeploy; #4 (public reset/explorer) is still the user's call
 
 ## Decisions
 

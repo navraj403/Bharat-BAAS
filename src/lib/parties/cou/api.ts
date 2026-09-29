@@ -43,9 +43,13 @@ export async function fetchBill(req: CouFetchRequest): Promise<FetchResult> {
   });
 }
 
-/** `POST /api/cou/pay`. simulateFailure never calls NBBL. */
+/** Demo helpers (simulated failure) are honoured only when the demo flag is on, server-side too. */
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
+/** `POST /api/cou/pay`. simulateFailure (demo mode only) never calls NBBL. */
 export async function pay(req: CouPayRequest): Promise<PayResult> {
-  if (!req.fetchRef) throw new BadRequestError("fetchRef is required");
+  // NBBL issues `F-` + 10 [A-Z0-9]; the looser bound keeps test refs valid and rejects junk.
+  if (!/^F-[A-Z0-9]{1,20}$/.test(req.fetchRef ?? "")) throw new BadRequestError("fetchRef is invalid");
   if (!Number.isInteger(req.amountPaise) || req.amountPaise <= 0) {
     throw new BadRequestError("amountPaise must be a positive integer");
   }
@@ -55,7 +59,7 @@ export async function pay(req: CouPayRequest): Promise<PayResult> {
   await sql`insert into cou_payments (order_id, fetch_ref, amount_paise, mode, status)
     values (${couOrderId}, ${req.fetchRef}, ${req.amountPaise}, ${req.mode}, 'INITIATED')`;
 
-  if (req.simulateFailure) {
+  if (req.simulateFailure && DEMO_MODE) {
     await sql`update cou_payments set status = 'FAILED', updated_at = now() where order_id = ${couOrderId}`;
     return {
       status: "FAILED",

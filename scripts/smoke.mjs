@@ -222,12 +222,22 @@ async function main() {
   });
 
   // i
-  await step("i. pay again with the old fetchRef -> rejected, no double charge", async () => {
+  await step("i. pay again with the same fetchRef -> same receipt (idempotent), no double charge", async () => {
     const r = await pay({ fetchRef: s.riyaFetchRef, amountPaise: 672600, mode: "UPI" });
-    eq(r.status, "FAILED", "status");
-    eq(r.responseCode, "BPR002", "responseCode");
+    eq(r.status, "SUCCESS", "status");
+    eq(r.receipt.bbpsTxnRef, s.riyaRef, "same bbpsTxnRef");
     const o = await get("/api/biller/overview?billerId=demo-finance");
     eq(o.payments.length, s.paymentsAfterRiya, "payments count unchanged");
+    const list = await get("/api/nbbl/transactions?type=PAY&limit=200");
+    eq(list.filter((t) => t.fetchRef === s.riyaFetchRef).length, 1, "one PAY txn for the fetchRef");
+    return `${r.status} ${r.receipt.bbpsTxnRef}`;
+  });
+  await step("i. pay with a fresh fetch after payment -> not payable (ALREADY_PAID fetch)", async () => {
+    const f = await fetchBill(RIYA);
+    eq(f.result, "ALREADY_PAID", "result");
+    const r = await pay({ fetchRef: f.fetchRef, amountPaise: 672600, mode: "UPI" });
+    eq(r.status, "FAILED", "status");
+    eq(r.responseCode, "BPR002", "responseCode");
     return `${r.failureReason} ${r.responseCode}`;
   });
 

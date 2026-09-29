@@ -118,6 +118,32 @@ describe("nbbl", () => {
     expect(s.successRate).toBeGreaterThan(0);
   });
 
+  it("retry on the same fetchRef replays the advice: same bbpsTxnRef, one PAY txn", async () => {
+    fetchBillMock.mockResolvedValue(dueResp);
+    const f = await billFetch(fetchReq());
+    paymentAdviceMock.mockImplementation(
+      async (a: PaymentAdvice): Promise<PaymentAdviceAck> => ({
+        ack: true,
+        responseCode: "000",
+        message: "Success",
+        bbpsTxnRef: a.bbpsTxnRef,
+        presentmentId: a.presentmentId,
+        billerPaymentId: "bp1",
+        receipt: { ...receipt, bbpsTxnRef: a.bbpsTxnRef } as PaymentAdviceAck["receipt"],
+      }),
+    );
+    const req = { couId: COU, fetchRef: f.fetchRef, amountPaise: 50000, mode: "UPI" as const, couOrderId: "DP-TEST000009" };
+    const first = await billPay(req);
+    // Simulate a timeout after the biller committed: the PAY txn was never closed.
+    await sql`update nbbl_transactions set status = 'PENDING' where ref = ${first.bbpsTxnRef}`;
+    const again = await billPay({ ...req, couOrderId: "DP-TEST000010" });
+
+    expect(again).toMatchObject({ status: "SUCCESS", bbpsTxnRef: first.bbpsTxnRef });
+    expect(paymentAdviceMock.mock.calls[1][0]).toMatchObject({ bbpsTxnRef: first.bbpsTxnRef, presentmentId: PRESENTMENT });
+    const pays = await sql`select status from nbbl_transactions where fetch_ref = ${f.fetchRef} and type = 'PAY'`;
+    expect(pays.map((r) => r.status)).toEqual(["SUCCESS"]);
+  });
+
   it("unknown biller -> BFR003 without calling the biller", async () => {
     const f = await billFetch(fetchReq("TEST-NOPE"));
     expect(f).toMatchObject({ result: "BILLER_UNAVAILABLE", responseCode: "BFR003" });

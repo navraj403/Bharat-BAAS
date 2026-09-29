@@ -94,6 +94,20 @@ export async function getTxn(ref: string): Promise<NbblTxn | null> {
   return rows.length ? toTxn(rows[0]) : null;
 }
 
+/**
+ * The newest PAY txn for a fetchRef that is SUCCESS or still PENDING (e.g. the request timed out
+ * after the biller committed), with its PAY_REQ payload so the same advice can be replayed.
+ */
+export async function latestLivePay(
+  fetchRef: string,
+): Promise<{ txn: NbblTxn; payReq: { mode?: string; paidAt?: string } | null } | null> {
+  const rows = await sql`select t.*, e.payload as pay_req from nbbl_transactions t
+    left join nbbl_events e on e.txn_ref = t.ref and e.step = 'PAY_REQ'
+    where t.fetch_ref = ${fetchRef} and t.type = 'PAY' and t.status in ('SUCCESS', 'PENDING')
+    order by t.created_at desc, t.id desc limit 1`;
+  return rows.length ? { txn: toTxn(rows[0]), payReq: rows[0].pay_req ?? null } : null;
+}
+
 export async function listTxns(type: NbblTxnType | undefined, limit: number): Promise<NbblTxn[]> {
   const rows = type
     ? await sql`select * from nbbl_transactions where type = ${type} order by created_at desc, id desc limit ${limit}`

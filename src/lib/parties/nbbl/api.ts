@@ -139,6 +139,10 @@ export async function billPay(req: BillPaymentRequest): Promise<BillPaymentRespo
     return { status: "FAILED", bbpsTxnRef: null, receipt: null, ...meta("BPR002") };
   }
 
+  // Idempotency per fetchRef: a retry (timeout, second tab) replays the earlier advice.
+  const prior = await repo.latestLivePay(req.fetchRef);
+  if (prior) return replayPay(prior.txn, prior.payReq, req, started);
+
   const bbpsTxnRef = newBbpsTxnRef();
   const billerRef = fetchTxn.billerRef;
   await repo.insertTxn({
@@ -197,19 +201,80 @@ export async function billPay(req: BillPaymentRequest): Promise<BillPaymentRespo
     return fail("SYS500");
   }
 
-  await repo.logEvent(bbpsTxnRef, "ADVICE_ACK", {
+  if (ack.ack && ack.receipt) {
+    // The biller has collected: bookkeeping failures must not turn this into FAILED for the COU.
+    await bestEffort(async () => {
+      await logAck(bbpsTxnRef, ack);
+      await repo.logEvent(bbpsTxnRef, "COU_RESP", { status: "SUCCESS", responseCode: "000" });
+      await repo.closeTxn(bbpsTxnRef, "SUCCESS", "000", Date.now() - started);
+    });
+    return { status: "SUCCESS", bbpsTxnRef, receipt: ack.receipt, ...meta("000") };
+  }
+  await logAck(bbpsTxnRef, ack);
+  return fail(ack.responseCode === "000" ? "BPR002" : ack.responseCode, ack.message);
+}
+
+type Ack = Awaited<ReturnType<typeof biller.paymentAdvice>>;
+
+function logAck(ref: string, ack: Ack): Promise<void> {
+  return repo.logEvent(ref, "ADVICE_ACK", {
     ack: ack.ack,
     responseCode: ack.responseCode,
     bbpsTxnRef: ack.bbpsTxnRef,
     billerPaymentId: ack.billerPaymentId,
   });
+}
 
-  if (ack.ack && ack.receipt) {
-    await repo.logEvent(bbpsTxnRef, "COU_RESP", { status: "SUCCESS", responseCode: "000" });
-    await repo.closeTxn(bbpsTxnRef, "SUCCESS", "000", Date.now() - started);
-    return { status: "SUCCESS", bbpsTxnRef, receipt: ack.receipt, ...meta("000") };
+async function bestEffort(fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    console.error("[nbbl] post-ack bookkeeping failed", e);
   }
-  return fail(ack.responseCode === "000" ? "BPR002" : ack.responseCode, ack.message);
+}
+
+/**
+ * Re-sends the advice of an earlier SUCCESS/PENDING PAY txn under its own bbpsTxnRef. The biller
+ * is idempotent on bbpsTxnRef, so an already-collected payment returns the same receipt.
+ */
+async function replayPay(
+  txn: NbblTxn,
+  payReq: { mode?: string; paidAt?: string } | null,
+  req: BillPaymentRequest,
+  started: number,
+): Promise<BillPaymentResponse> {
+  const ref = txn.ref;
+  const mode = (payReq?.mode ?? req.mode) as BillPaymentRequest["mode"];
+  await bestEffort(() =>
+    repo.logEvent(ref, "COU_REQ", { retry: true, couOrderId: req.couOrderId, fetchRef: req.fetchRef }),
+  );
+
+  let ack: Ack;
+  try {
+    ack = await biller.paymentAdvice({
+      billerId: txn.billerId,
+      presentmentId: txn.billerRef ?? "",
+      amountPaise: txn.amountPaise ?? req.amountPaise,
+      bbpsTxnRef: ref,
+      mode,
+      paidAt: payReq?.paidAt ?? new Date().toISOString(),
+    });
+  } catch (e) {
+    await bestEffort(() => repo.logEvent(ref, "ERROR", { code: "SYS500", reason: errMsg(e) }));
+    return { status: "FAILED", bbpsTxnRef: ref, receipt: null, ...meta("SYS500") };
+  }
+
+  const ok = ack.ack && ack.receipt;
+  const code: ResponseCode = ok ? "000" : ack.responseCode === "000" ? "BPR002" : ack.responseCode;
+  await bestEffort(async () => {
+    await logAck(ref, ack);
+    await repo.logEvent(ref, "COU_RESP", { status: ok ? "SUCCESS" : "FAILED", responseCode: code });
+    if (txn.status === "PENDING") {
+      await repo.closeTxn(ref, ok ? "SUCCESS" : "FAILED", code, Date.now() - started);
+    }
+  });
+  if (ok && ack.receipt) return { status: "SUCCESS", bbpsTxnRef: ref, receipt: ack.receipt, ...meta("000") };
+  return { status: "FAILED", bbpsTxnRef: ref, receipt: null, responseCode: code, message: ack.message };
 }
 
 /** `GET /api/nbbl/transactions`. Newest first; default limit 50, max 200. */

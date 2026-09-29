@@ -7,8 +7,9 @@
  *   are atomic in one `withTx`.
  * - "Today" is the DB's `current_date` (same clock as the seed's `now()`-relative dates).
  * - paymentAdvice commits the biller side first, THEN calls `oem.markPaid` best-effort. The money is
- *   collected once the biller commits; an OEM failure is logged and repaired by any retry of the
- *   same advice (idempotent replay re-sends markPaid; the OEM ignores already-PAID bills).
+ *   collected once the biller commits; an OEM failure is logged and repaired by a retry of the
+ *   same advice (idempotent replay re-sends markPaid) or by the next `sync` (repairOemPaidFlags).
+ *   The OEM ignores already-PAID bills, so both are harmless.
  */
 import { withTx } from "@/lib/db/client";
 import {
@@ -206,8 +207,8 @@ export async function paymentAdvice(advice: PaymentAdvice): Promise<PaymentAdvic
     try {
       await oemMarkPaid(outcome.oemBillIds, advice.bbpsTxnRef, outcome.ack.receipt?.paidAt ?? paidAt);
     } catch (err) {
-      // Biller has collected; the OEM flag is repaired by a retry of this same advice.
-      console.error("[biller] oem.markPaid failed; will be retried on the next identical advice", err);
+      // Biller has collected; the OEM flag is repaired by a retry of this advice or the next sync.
+      console.error("[biller] oem.markPaid failed; will be retried by an identical advice or sync", err);
     }
   }
   return outcome.ack;
@@ -282,11 +283,38 @@ export async function sync(billerId: string): Promise<BillerSyncResponse> {
   let synced = 0;
   for (const c of customers) {
     const bills = (await oemBillsFor(c.vehicle_reg_no)).filter((b) => normaliseRegNo(b.regNo) === c.vehicle_reg_no);
-    synced += await withTx(async (tx) => {
+    const { n, settled } = await withTx(async (tx) => {
       const n = await repo.upsertReceivables(tx, c, bills);
       await repo.markOverdue(tx, { customerId: c.id });
-      return n;
+      return { n, settled: await repo.settledReceivables(tx, c.id) };
     });
+    synced += n;
+    await repairOemPaidFlags(bills, settled);
   }
   return { synced };
+}
+
+/**
+ * Re-sends `markPaid` for bills the biller has collected but the OEM still shows UNPAID (the
+ * best-effort call after a payment advice failed). Runs outside any transaction; failures are logged.
+ */
+async function repairOemPaidFlags(
+  bills: OemBill[],
+  settled: { oem_bill_id: string; bbps_txn_ref: string; paid_at: Date }[],
+): Promise<void> {
+  const unpaidAtOem = new Set(bills.filter((b) => b.paymentStatus !== "PAID").map((b) => b.id));
+  const byRef = new Map<string, { ids: string[]; paidAt: string }>();
+  for (const s of settled) {
+    if (!unpaidAtOem.has(s.oem_bill_id)) continue;
+    const g = byRef.get(s.bbps_txn_ref) ?? { ids: [], paidAt: s.paid_at.toISOString() };
+    g.ids.push(s.oem_bill_id);
+    byRef.set(s.bbps_txn_ref, g);
+  }
+  for (const [ref, g] of byRef) {
+    try {
+      await oemMarkPaid(g.ids, ref, g.paidAt);
+    } catch (err) {
+      console.error("[biller] sync could not repair oem.markPaid", err);
+    }
+  }
 }

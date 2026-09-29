@@ -70,7 +70,7 @@ describe("fixtures reproduce BUILD_PLAN §4", () => {
     expect(fixtureFetch({ ...RIYA, vehicleNo: "MH01AB9999" }).result).toBe("BILLER_UNAVAILABLE");
   });
 
-  it("pay → receipt BC…, re-fetch ALREADY_PAID, double pay rejected, simulated failure", () => {
+  it("pay → receipt BC…, re-fetch ALREADY_PAID, retry idempotent, stale pay rejected, simulated failure", () => {
     const f = fixtureFetch(RIYA);
     if (f.result !== "BILL_DUE") throw new Error(f.result);
     expect(fixturePay({ fetchRef: f.fetchRef, amountPaise: 1, mode: "UPI" })).toMatchObject({ status: "FAILED", responseCode: "BPR001" });
@@ -78,8 +78,11 @@ describe("fixtures reproduce BUILD_PLAN §4", () => {
     const p = fixturePay({ fetchRef: f.fetchRef, amountPaise: 672600, mode: "UPI" });
     if (p.status !== "SUCCESS") throw new Error(p.message);
     expect(p.receipt.bbpsTxnRef).toMatch(/^BC[A-Z0-9]{10}$/);
-    expect(fixtureFetch(RIYA).result).toBe("ALREADY_PAID");
-    expect(fixturePay({ fetchRef: f.fetchRef, amountPaise: 672600, mode: "UPI" })).toMatchObject({ status: "FAILED", responseCode: "BPR002" });
+    const paid = fixtureFetch(RIYA);
+    expect(paid.result).toBe("ALREADY_PAID");
+    const retry = fixturePay({ fetchRef: f.fetchRef, amountPaise: 672600, mode: "UPI" });
+    expect(retry.status === "SUCCESS" && retry.receipt.bbpsTxnRef).toBe(p.receipt.bbpsTxnRef);
+    expect(fixturePay({ fetchRef: paid.fetchRef, amountPaise: 672600, mode: "UPI" })).toMatchObject({ status: "FAILED", responseCode: "BPR002" });
     expect(fixtureTransaction(p.receipt.bbpsTxnRef)?.events.map((e) => e.step)).toEqual(["COU_REQ", "PAY_REQ", "ADVICE_ACK", "COU_RESP"]);
     expect(fixtureBillerOverview("demo-finance").kpis.collectedPaise).toBe(672600);
   });

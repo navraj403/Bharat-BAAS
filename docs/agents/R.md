@@ -27,3 +27,8 @@ Scope: `git diff 9a4eba8..HEAD -- src scripts supabase`. Every finding below was
 | 13 | LOW | `src/lib/parties/oem/service.ts:15`, `supabase/seed.sql:27-28`, `rules.ts:nextBillDate` | Missing `// ASSUMPTION:` tags: `MAX_TRIP_KM = 10_000`, the PRO/FLEX fees and all per-km rates (only the STD row is tagged), and "bills generate on the 1st" (`nextBillDate`). GST/late fee/due days/fixed-fee-no-prorate are tagged. | Add the tags. |
 
 Counts: BLOCKER 0 · HIGH 2 · MEDIUM 5 · LOW 6.
+
+## Resolution (PM, after G4)
+- Fixed: #1, #3, #5 and #6 (gate 3); #7 to #13 (post-G4). #7: a retry now gets the original receipt, not BPR002. A fresh fetch after payment still returns BPR002.
+- Mitigated: #2, by the "reset before every demo" rule in STATUS.md.
+- Open: #4 (unauthenticated reset and DB explorer on the public URL). Waiting on the user's decision.

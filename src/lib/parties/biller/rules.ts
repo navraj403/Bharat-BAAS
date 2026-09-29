@@ -13,12 +13,12 @@ import type {
   ReceivableStatus,
 } from "@/lib/domain/types";
 import { formatCycle } from "@/lib/domain/cycle";
+import { formatINR } from "@/lib/domain/money";
+import { GST_BPS, LATE_FEE_BPS } from "@/lib/domain/billing";
 
-// Source of truth: src/lib/domain/billing.ts (GST_BPS / LATE_FEE_BPS); keep these in sync.
-// ASSUMPTION: GST 18% on the OEM bill (the OEM computes it; the biller only labels it).
-export const GST_BPS = 1800;
-// ASSUMPTION: late fee = 2% of an overdue bill's SUBTOTAL, one-time, no GST (docs/DOMAIN.md §4).
-export const LATE_FEE_BPS = 200;
+// ASSUMPTION (tagged at the source, src/lib/domain/billing.ts): GST 18%; late fee 2% of an overdue
+// bill's SUBTOTAL, one-time, no GST (docs/DOMAIN.md §4). Re-exported so there is one definition.
+export { GST_BPS, LATE_FEE_BPS };
 
 /** `mh-01 ab 1001` → `MH01AB1001`. */
 export function normaliseRegNo(v: string): string {
@@ -64,9 +64,7 @@ export function nextBillDate(today: IsoDate): IsoDate {
   return `${ny}-${String(nm).padStart(2, "0")}-01`;
 }
 
-function rupees(paise: Paise): string {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(paise / 100);
-}
+const rupees = (paise: Paise): string => formatINR(paise);
 
 /** An open (UNPAID/OVERDUE) receivable joined with its OEM bill, as input to the presentment. */
 export interface OpenCycle {

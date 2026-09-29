@@ -154,6 +154,18 @@ export async function receivablesForCustomer(tx: Tx, customerId: string): Promis
     from biller_receivables where customer_id = ${customerId} order by cycle`;
 }
 
+/** Receivables this biller settled itself, with the payment that settled them. */
+export async function settledReceivables(
+  tx: Tx,
+  customerId: string,
+): Promise<{ oem_bill_id: string; bbps_txn_ref: string; paid_at: Date }[]> {
+  return tx<{ oem_bill_id: string; bbps_txn_ref: string; paid_at: Date }[]>`
+    select r.oem_bill_id::text as oem_bill_id, p.bbps_txn_ref, p.paid_at
+    from biller_receivables r
+    join biller_payments p on p.id = r.paid_payment_id
+    where r.customer_id = ${customerId} and r.status = 'PAID'`;
+}
+
 export async function latestOpenPresentment(tx: Tx, customerId: string): Promise<PresentmentRow | null> {
   const [r] = await tx<PresentmentRow[]>`
     select id, biller_id, customer_id, receivable_ids::text[] as receivable_ids, amount_paise, breakdown, status
