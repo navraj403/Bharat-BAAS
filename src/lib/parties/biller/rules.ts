@@ -12,8 +12,8 @@ import type {
   PresentedCycle,
   ReceivableStatus,
 } from "@/lib/domain/types";
-
 import { formatCycle } from "@/lib/domain/cycle";
+
 // ASSUMPTION: GST 18% on the OEM bill (the OEM computes it; the biller only labels it).
 export const GST_BPS = 1800;
 // ASSUMPTION: late fee = 2% of an overdue bill's SUBTOTAL, one-time, no GST (docs/DOMAIN.md §4).

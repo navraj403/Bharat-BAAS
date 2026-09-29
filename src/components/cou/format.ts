@@ -1,16 +1,4 @@
-// Local formatters. TODO(integrator): swap formatINR for src/lib/domain/money.ts once it exists.
-
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-/** Integer paise -> "₹6,726.00". */
-export function formatINR(paise: number): string {
-  return inr.format(paise / 100);
-}
+// COU display helpers. Money is formatted with formatINR from src/lib/domain/money.ts.
 
 /** Uppercase, strip spaces and dashes: "mh-01 ab 1001" -> "MH01AB1001". */
 export function normaliseVehicle(input: string): string {

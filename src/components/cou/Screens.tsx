@@ -164,7 +164,7 @@ export function DetailsScreen({
       title="Enter vehicle details"
       onBack={onBack}
       footer={
-        <Button disabled={!vOk || !mOk} loading={fetching} onClick={onFetch}>
+        <Button type="submit" form="cou-details-form" disabled={!vOk || !mOk} loading={fetching}>
           {fetching ? "Fetching bill…" : "Fetch bill"}
         </Button>
       }
@@ -178,6 +178,7 @@ export function DetailsScreen({
       </div>
 
       <form
+        id="cou-details-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (vOk && mOk && !fetching) onFetch();
@@ -230,9 +231,6 @@ export function DetailsScreen({
             {mErr}
           </p>
         </div>
-        <button type="submit" className="sr-only" tabIndex={-1}>
-          Fetch bill
-        </button>
       </form>
 
       {error && (

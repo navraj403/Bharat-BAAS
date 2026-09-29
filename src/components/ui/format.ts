@@ -1,16 +1,4 @@
-// Local display formatters (agent E). money.ts (agent A) may replace formatMoney later.
-// All money is integer paise; format only at display time.
-
-const inr = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-export function formatMoney(paise: number): string {
-  return inr.format(paise / 100);
-}
+// Console display helpers (agent E). Money is formatted with formatINR from src/lib/domain/money.ts.
 
 /** `MH01AB1001` -> `MH 01 AB 1001`. Falls back to the input if it does not match. */
 export function formatRegNo(reg: string): string {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PaymentMode } from "@/lib/domain/types";
 import { Button, FOCUS, Spinner } from "./ui";
-import { formatINR } from "./format";
+import { formatINR } from "@/lib/domain/money";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
@@ -89,6 +89,8 @@ export function PaySheet({
                       <input
                         type="radio"
                         name="mode"
+                        value={m.mode}
+                        aria-label={m.label}
                         checked={mode === m.mode}
                         onChange={() => setMode(m.mode)}
                         className="size-4 accent-accent"
@@ -103,6 +105,7 @@ export function PaySheet({
                     <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-line-strong p-3 text-sm text-ink">
                       <input
                         type="checkbox"
+                        aria-label="Simulate failure (demo)"
                         checked={fail}
                         onChange={(e) => setFail(e.target.checked)}
                         className="size-4 accent-accent"

@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import type { BillPresentment, FetchResult, Receipt } from "@/lib/domain/types";
 import { Button, Pill, Screen } from "./ui";
-import { MODE_LABEL, displayVehicle, formatDate, formatDateTime, formatINR } from "./format";
+import { formatINR } from "@/lib/domain/money";
+import { MODE_LABEL, displayVehicle, formatDate, formatDateTime } from "./format";
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -34,11 +35,10 @@ function BillDue({ bill }: { bill: BillPresentment }) {
       </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-        <h2 className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">
+        <h2 id="bill-breakdown-heading" className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">
           Bill breakdown
         </h2>
-        <table className="w-full text-sm">
-          <caption className="sr-only">Bill breakdown</caption>
+        <table className="w-full text-sm" aria-labelledby="bill-breakdown-heading">
           <tbody className="divide-y divide-line">
             {bill.lines.map((l, i) => (
               <tr key={`${l.kind}-${l.cycle}-${i}`}>
