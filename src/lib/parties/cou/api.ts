@@ -12,9 +12,17 @@ import type {
   CouOrder,
   CouPayRequest,
   FetchResult,
+  NbblComplaint,
   PayResult,
   RaiseComplaintRequest,
 } from "@/lib/domain/types";
+import {
+  ComplaintInputError,
+  ComplaintNotFoundError,
+  isComplaintReason,
+  newCouTicketNo,
+  normaliseDescription,
+} from "@/lib/domain/complaints";
 import * as nbbl from "@/lib/parties/nbbl/api";
 import { newOrderId, normaliseVehicleNo } from "./util";
 
@@ -126,12 +134,62 @@ export async function pay(req: CouPayRequest): Promise<PayResult> {
 // Errors: the Complaint* classes from src/lib/domain/complaints.ts (re-exported by nbbl/api):
 // ComplaintInputError → 400, ComplaintNotFoundError → 404 (unknown orderId).
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Row = Record<string, any>;
+const iso = (d: unknown): string => (d instanceof Date ? d.toISOString() : String(d));
+
+function toOrder(r: Row, billerNames: Map<string, string>): CouOrder {
+  return {
+    orderId: r.order_id,
+    fetchRef: r.fetch_ref,
+    bbpsTxnRef: r.bbps_txn_ref ?? null,
+    billerId: r.biller_id ?? null,
+    billerName: r.biller_id ? (billerNames.get(r.biller_id) ?? null) : null,
+    vehicleRegNo: r.vehicle_reg_no ?? null,
+    amountPaise: r.amount_paise,
+    mode: r.mode,
+    status: r.status,
+    createdAt: iso(r.created_at),
+  };
+}
+
+async function billerNameMap(): Promise<Map<string, string>> {
+  return new Map((await nbbl.listBillers()).map((b) => [b.id, b.name]));
+}
+
 /**
  * `GET /api/cou/orders`. Every cou_payments row (single demo user), newest first, with
  * billerName resolved via nbbl.listBillers (null when unknown).
  */
 export async function listOrders(): Promise<CouOrder[]> {
-  throw new Error("NotImplemented");
+  const [rows, names] = await Promise.all([
+    sql`select * from cou_payments order by created_at desc, id desc`,
+    billerNameMap(),
+  ]);
+  return rows.map((r) => toOrder(r, names));
+}
+
+function toTicket(t: Row, c: NbblComplaint, order: Row | undefined): CouComplaint {
+  return {
+    ticketNo: t.ticket_no,
+    complaintId: c.complaintId,
+    orderId: t.order_id,
+    bbpsTxnRef: order?.bbps_txn_ref ?? c.txnRef,
+    billerId: c.billerId,
+    billerName: c.billerName,
+    vehicleRegNo: order?.vehicle_reg_no ?? null,
+    amountPaise: c.amountPaise,
+    reason: t.reason,
+    description: t.description ?? null,
+    status: c.status,
+    pendingWith: c.pendingWith,
+    resolution: c.resolution,
+    dueAt: c.dueAt,
+    overdue: c.overdue,
+    createdAt: iso(t.created_at),
+    updatedAt: c.updatedAt,
+    closedAt: c.closedAt,
+  };
 }
 
 /**
@@ -141,11 +199,50 @@ export async function listOrders(): Promise<CouOrder[]> {
  * ticket for it (no new row). Returns the merged ticket.
  */
 export async function raiseComplaint(req: RaiseComplaintRequest): Promise<CouComplaint> {
-  void req;
-  throw new Error("NotImplemented");
+  if (!isComplaintReason(req?.reason)) throw new ComplaintInputError("reason is not a valid complaint reason");
+  const description = normaliseDescription(req.description);
+  if (typeof req.orderId !== "string" || !req.orderId) throw new ComplaintInputError("orderId is required");
+  const orders = await sql`select * from cou_payments where order_id = ${req.orderId}`;
+  if (!orders.length) throw new ComplaintNotFoundError(`Order ${req.orderId} not found`);
+  const order = orders[0];
+
+  const ticketNo = newCouTicketNo();
+  const c = await nbbl.raiseComplaint({
+    couId: COU_ID,
+    couTicketNo: ticketNo,
+    orderId: order.order_id,
+    bbpsTxnRef: order.bbps_txn_ref ?? null,
+    billerId: order.biller_id ?? null,
+    vehicleRegNo: order.vehicle_reg_no ?? null,
+    amountPaise: order.amount_paise,
+    reason: req.reason,
+    ...(description ? { description } : {}),
+  });
+
+  const existing = await sql`select * from cou_complaints where complaint_id = ${c.complaintId}`;
+  if (existing.length) return toTicket(existing[0], c, order);
+
+  // New complaint (c.couTicketNo === ticketNo), or an NBBL-side one whose COU row is missing.
+  const inserted = await sql`insert into cou_complaints (ticket_no, order_id, complaint_id, reason, description)
+    values (${c.couTicketNo}, ${order.order_id}, ${c.complaintId}, ${req.reason}, ${description})
+    on conflict (ticket_no) do update set ticket_no = excluded.ticket_no
+    returning *`;
+  return toTicket(inserted[0], c, order);
 }
 
 /** `GET /api/cou/complaints`. COU tickets, newest first, merged with live NBBL status. */
 export async function listComplaints(): Promise<CouComplaint[]> {
-  throw new Error("NotImplemented");
+  const [tickets, live, orders] = await Promise.all([
+    sql`select * from cou_complaints order by created_at desc, id desc`,
+    nbbl.listComplaints({ couId: COU_ID }),
+    sql`select order_id, bbps_txn_ref, vehicle_reg_no from cou_payments`,
+  ]);
+  const byId = new Map(live.map((c) => [c.complaintId, c]));
+  const byOrder = new Map(orders.map((o) => [o.order_id as string, o as Row]));
+  const out: CouComplaint[] = [];
+  for (const t of tickets) {
+    const c = byId.get(t.complaint_id);
+    if (c) out.push(toTicket(t, c, byOrder.get(t.order_id)));
+  }
+  return out;
 }

@@ -29,6 +29,20 @@ import type {
   ResponseMeta,
 } from "@/lib/domain/types";
 import { RESPONSE_MESSAGES } from "@/lib/domain/types";
+import {
+  ComplaintInputError,
+  ComplaintNotFoundError,
+  applyAction,
+  dueAt as complaintDueAt,
+  initialAssignee,
+  isComplaintParty,
+  isComplaintReason,
+  isComplaintStatus,
+  newComplaintId,
+  normaliseDescription,
+  summariseComplaints,
+} from "@/lib/domain/complaints";
+import * as complaintsRepo from "./complaints-repo";
 import * as repo from "./repo";
 import { maskMobile, newBbpsTxnRef, newFetchRef, normaliseVehicleNo } from "./util";
 
@@ -332,8 +346,45 @@ export {
  * Throws ComplaintInputError for an invalid reason/description/amount.
  */
 export async function raiseComplaint(req: NbblRaiseComplaintRequest): Promise<NbblComplaint> {
-  void req;
-  throw new Error("NotImplemented");
+  if (!isComplaintReason(req?.reason)) throw new ComplaintInputError("reason is not a valid complaint reason");
+  const description = normaliseDescription(req.description);
+  if (!req.couId || !req.orderId || !req.couTicketNo) {
+    throw new ComplaintInputError("couId, couTicketNo and orderId are required");
+  }
+  if (!Number.isInteger(req.amountPaise) || req.amountPaise < 0) {
+    throw new ComplaintInputError("amountPaise must be a non-negative integer");
+  }
+
+  const existing = await complaintsRepo.findOpenByOrder(req.couId, req.orderId, req.reason);
+  if (existing) return existing;
+
+  const payTxn = req.bbpsTxnRef ? await repo.getTxn(req.bbpsTxnRef) : null;
+  const pay = payTxn && payTxn.type === "PAY" ? payTxn : null;
+  const pendingWith = initialAssignee(req.reason, pay?.status ?? null);
+  const createdAt = new Date().toISOString();
+  const complaintId = newComplaintId();
+  await complaintsRepo.insertComplaint(
+    {
+      complaintId,
+      couId: req.couId,
+      couTicketNo: req.couTicketNo,
+      orderId: req.orderId,
+      txnRef: pay?.ref ?? null,
+      billerId: pay?.billerId ?? req.billerId,
+      // NBBL stores masked refs only: the PAY txn's, else the (non-sensitive) vehicle reg no.
+      customerRefMasked: pay?.customerRefMasked ?? (req.vehicleRegNo ? normaliseVehicleNo(req.vehicleRegNo) : null),
+      amountPaise: req.amountPaise,
+      reason: req.reason,
+      description,
+      pendingWith,
+      dueAt: complaintDueAt(createdAt, req.reason),
+      createdAt,
+    },
+    "Auto-triage",
+  );
+  const created = await complaintsRepo.getComplaint(complaintId);
+  if (!created) throw new Error("Complaint vanished after insert");
+  return created;
 }
 
 /**
@@ -343,14 +394,28 @@ export async function raiseComplaint(req: NbblRaiseComplaintRequest): Promise<Nb
 export async function listComplaints(
   query?: NbblComplaintQuery & { couId?: string },
 ): Promise<NbblComplaint[]> {
-  void query;
-  throw new Error("NotImplemented");
+  if (query?.status !== undefined && !isComplaintStatus(query.status)) {
+    throw new ComplaintInputError("status must be OPEN or CLOSED");
+  }
+  if (query?.pendingWith !== undefined && !isComplaintParty(query.pendingWith)) {
+    throw new ComplaintInputError("pendingWith must be COU, NBBL or BILLER");
+  }
+  return complaintsRepo.listComplaints({
+    status: query?.status,
+    pendingWith: query?.pendingWith,
+    couId: query?.couId,
+  });
 }
 
 /** `GET /api/nbbl/complaints/:id`. Complaint + events (oldest first) + linked PAY txn. Null if unknown. */
 export async function getComplaint(complaintId: string): Promise<NbblComplaintDetail | null> {
-  void complaintId;
-  throw new Error("NotImplemented");
+  const c = await complaintsRepo.getComplaint(complaintId);
+  if (!c) return null;
+  const [events, txn] = await Promise.all([
+    complaintsRepo.listComplaintEvents(complaintId),
+    c.txnRef ? repo.getTxn(c.txnRef) : Promise.resolve(null),
+  ]);
+  return { ...c, events, linkedTxn: txn && txn.type === "PAY" ? txn : null };
 }
 
 /**
@@ -363,12 +428,17 @@ export async function complaintAction(
   complaintId: string,
   req: ComplaintActionRequest,
 ): Promise<NbblComplaintDetail> {
-  void complaintId;
-  void req;
-  throw new Error("NotImplemented");
+  const found = await complaintsRepo.applyLocked(complaintId, (current) => {
+    const { next, event } = applyAction(current, req);
+    return { ...next, event };
+  });
+  if (!found) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);
+  const detail = await getComplaint(complaintId);
+  if (!detail) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);
+  return detail;
 }
 
 /** `GET /api/nbbl/complaints/stats`. KPIs over all complaints (complaints.summariseComplaints). */
 export async function complaintStats(): Promise<NbblComplaintStats> {
-  throw new Error("NotImplemented");
+  return summariseComplaints(await complaintsRepo.listComplaints({}));
 }

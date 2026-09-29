@@ -1,5 +1,6 @@
 /** Shared route helpers for the nbbl/cou/admin API folders. */
 import { NextResponse } from "next/server";
+import { ComplaintError } from "@/lib/domain/complaints";
 import { PAYMENT_MODES, type PaymentMode } from "@/lib/domain/types";
 
 export class HttpError extends Error {
@@ -48,6 +49,7 @@ export async function handle(fn: () => Promise<unknown>): Promise<Response> {
     return NextResponse.json(await fn());
   } catch (e) {
     if (e instanceof HttpError) return errorResponse(e.status, e.code, e.message);
+    if (e instanceof ComplaintError) return errorResponse(e.status, e.code, e.message);
     if (e instanceof Error && e.name === "BadRequestError") {
       return errorResponse(400, "BAD_REQUEST", e.message);
     }

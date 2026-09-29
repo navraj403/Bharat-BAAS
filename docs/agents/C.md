@@ -1,5 +1,28 @@
 # Agent C: NBBL switch + COU backend + Admin API
 
+## Phase C: Complaints
+
+**State:** DONE
+
+**Working on:** nothing
+
+**Done:**
+- `parties/nbbl/complaints-repo.ts` (new) + filled `raiseComplaint`, `listComplaints`, `getComplaint`, `complaintAction`, `complaintStats` in `nbbl/api.ts`. Actions run in one `withTx` with `select ... for update`, so concurrent actions serialise.
+- `parties/cou/api.ts`: `listOrders`, `raiseComplaint`, `listComplaints` (imports only `nbbl/api`).
+- Routes: `GET /api/cou/orders`, `GET|POST /api/cou/complaints`, `GET /api/nbbl/complaints`, `/stats`, `/[id]`, `POST /[id]/actions`. `nbbl/_http.ts` `handle` maps `ComplaintError` to its status/code.
+- `parties/nbbl/complaints.int.test.ts` (uses `TEST-COU` / `TEST-ORDER-1`, cleans up).
+- `npm run check` green (48 unit); `npm run test:int` green (34 tests, 6 files).
+
+**Pending:** none
+
+**Files touched:** `src/lib/parties/nbbl/{api,complaints-repo,complaints.int.test}.ts`, `src/lib/parties/cou/api.ts`, `src/app/api/nbbl/_http.ts`, `src/app/api/nbbl/complaints/**`, `src/app/api/cou/{orders,complaints}/route.ts`
+
+**Contract questions:**
+- none. Notes: raise is idempotent by lookup (no unique index), so two truly simultaneous raises could both insert. `customerRefMasked` falls back to the normalised vehicle reg no when there is no PAY txn (as in the fixtures).
+
+---
+
+
 **Model:** Sonnet · **Phase:** P1 · **State:** DONE
 **Last update:** 15:50
 
