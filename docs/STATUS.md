@@ -10,7 +10,7 @@ Phase-level log kept by the PM. Per-agent detail lives in `docs/agents/<id>.md`.
 | G1 Parallel build (A–E) | 1:05 | **passed** (`7a553c4`) | Lanes D `1db6d31`, E `a7faa4b`, A `4458fdc`, C `4ac99c9`, B `3441dcd`. check 27/27, test:int 26/26, build green. Live COU→NBBL→Biller→OEM fetch for Riya returns ₹6,726.00 |
 | G2 Integration + smoke | 1:30 | **passed** | PM re-ran: check 29/29, build green, `npm run smoke` 22/22 (98 s). I fixed pooler hangs (no pipelining, reserved-connection tx) and the QA list |
 | G3 QA walkthrough | 1:45 | **passed** | PM live walkthrough (Riya fetch ₹6,726.00 → pay → `BC…` receipt → NBBL log → OEM). Review R: 0 blocker, 2 high, 5 medium, 6 low; fixed: Tokyo region hnd1 + maxDuration 60, generic 500s, payment-mode validation, mobile masking in DB explorer, ASSUMPTION tags. check 29/29, smoke 22/22, build green |
-| G4 Deployed URL | 2:00 | **waiting on user** | Vercel CLI 61 ready; user must run `npx vercel login` |
+| G4 Deployed URL | 2:00 | **passed** | https://bharat-baas.vercel.app (Vercel hnd1 next to the Supabase Tokyo pooler). `npm run smoke -- --base=<url>` 22/22 in 10 s; COU fetch 0.4–1.1 s (was 5–7 s locally) |
 
 ## PM QA notes (fixture-mode walkthrough on :3001) → for Integrator (P2)
 
@@ -42,3 +42,10 @@ All 5 were fixed by agent I (`777e468`, `1f05029`).
 - **DB client runs one query per connection** (`max_pipeline: 0`), and `withTx` uses a reserved connection with explicit BEGIN/COMMIT. Pipelining through the Supabase transaction pooler caused stuck connections, and the dev server hung for 60 s–14 min (found and fixed by agent I).
 - Latency: COU fetch ≈2.3–5 s and pay ≈3.5–5.5 s, because of multiple round trips to the Tokyo pooler. Acceptable for the demo; mention it when presenting.
 - Demo rule: seed dates are relative to reset time (Riya due reset+5 days). **Press Reset demo data before every demo**, or Riya picks up a late fee.
+- Vercel env vars must be added without a trailing newline (a PowerShell pipe appended one and caused `Invalid URL`). Re-added from temp files; see the deploy notes below.
+
+## Deploy notes
+
+- Project `navraj7/bharat-baas`, production https://bharat-baas.vercel.app, region hnd1 (`vercel.json`).
+- Env (production): DATABASE_URL (sensitive), NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_USE_FIXTURES=0, NEXT_PUBLIC_DEMO_MODE=1.
+- Redeploy: `npx vercel deploy --prod`. GitHub auto-deploy is not connected (Vercel's GitHub app lacks repo access); connect it in Vercel → Project → Git if wanted.
