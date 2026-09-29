@@ -42,6 +42,13 @@
   --color-info: #0e7490;
   --color-info-soft: #e5f6f9;
 
+  /* Customer app (DemoPay) palette: wallet-app style deep indigo. Generic, not any real app's brand. */
+  --color-pay: #534ab7;
+  --color-pay-deep: #3c3489;
+  --color-pay-soft: #eeedfe;
+  --color-pay-line: #e2e0f3;
+  --color-pay-canvas: #f4f3fb;
+
   /* Shape */
   --radius-card: 0.75rem;
   --radius-pill: 9999px;

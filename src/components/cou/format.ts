@@ -41,6 +41,12 @@ export function formatDateTime(s: string): string {
   });
 }
 
+// ASSUMPTION: bills generate on the 1st of each month (same rule as biller/rules.nextBillDate).
+/** 1st of next month (UTC), as `YYYY-MM-DD`. */
+export function nextBillDate(now = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+}
+
 export const MODE_LABEL: Record<string, string> = {
   UPI: "UPI",
   UPI_AUTOPAY: "UPI AutoPay",

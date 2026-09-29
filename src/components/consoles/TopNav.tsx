@@ -14,7 +14,10 @@ const LINKS = [
 export function TopNav() {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-surface">
+    // On a phone the customer app is full-screen, so its sticky pay button stays on screen.
+    <header
+      className={`sticky top-0 z-20 border-b border-line bg-surface ${pathname.startsWith("/cou") ? "max-[479px]:hidden" : ""}`}
+    >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2">
         <Link href="/" className="flex items-center gap-2 font-semibold text-ink">
           <span aria-hidden className="grid h-7 w-7 place-items-center rounded-lg bg-brand text-sm font-bold text-white">

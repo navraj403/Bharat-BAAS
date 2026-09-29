@@ -1,16 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { couFetch, couPay, getCouBillers } from "@/lib/client/api";
-import type { BillerSummary, FetchResult, PaymentMode } from "@/lib/domain/types";
-import { BillersScreen, DetailsScreen, HomeScreen, type BillersState } from "./Screens";
-import { ReceiptScreen, ResultScreen, type ReceiptView } from "./ResultScreens";
+import type { BillPresentment, BillerSummary, PaymentMode } from "@/lib/domain/types";
+import { BillersScreen, DetailsScreen, HomeScreen, type BillersState, type InlineResult, type RecentFetch } from "./Screens";
+import { BillScreen, ReceiptScreen, type ReceiptView } from "./ResultScreens";
 import { PaySheet } from "./PaySheet";
 import { normaliseVehicle } from "./format";
 
-type Screen = "home" | "billers" | "details" | "result" | "receipt";
+type Screen = "home" | "billers" | "details" | "bill" | "receipt";
+
+/** A payable bill and the NBBL fetch it came from. */
+interface DueBill {
+  bill: BillPresentment;
+  fetchRef: string;
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const FRAME_H = 800;
+// Site nav + disclaimer footer + page padding around the frame.
+const CHROME_H = 120;
+
+/** On screens ≥480px wide, the zoom that fits the 800px phone frame in the window (never above 1). */
+function useFrameZoom(): number {
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const fit = () =>
+      setZoom(window.innerWidth < 480 ? 1 : Math.max(0.6, Math.min(1, (window.innerHeight - CHROME_H) / FRAME_H)));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  return zoom;
+}
 
 export function CouApp() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -20,10 +43,14 @@ export function CouApp() {
   const [mobile, setMobile] = useState("");
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [result, setResult] = useState<FetchResult | null>(null);
+  // Paytm-style: every non-payable fetch result is shown inline on the details form.
+  const [inline, setInline] = useState<InlineResult | null>(null);
+  const [due, setDue] = useState<DueBill | null>(null);
+  const [recent, setRecent] = useState<RecentFetch | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptView | null>(null);
+  const frameZoom = useFrameZoom();
 
   async function loadBillers() {
     setBillers({ status: "loading" });
@@ -39,45 +66,57 @@ export function CouApp() {
     void loadBillers();
   }
 
+  function openDetails(b: BillerSummary) {
+    if (b.id !== biller?.id) setInline(null);
+    setBiller(b);
+    setFetchError(null);
+    setScreen("details");
+  }
+
+  // Editing the form clears the previous inline answer.
+  function editVehicle(v: string) {
+    setVehicle(v);
+    setInline(null);
+  }
+  function editMobile(m: string) {
+    setMobile(m);
+    setInline(null);
+  }
+
   async function doFetch() {
     if (!biller || fetching) return;
     setFetching(true);
     setFetchError(null);
+    setInline(null);
     try {
       const r = await couFetch({ billerId: biller.id, vehicleNo: normaliseVehicle(vehicle), mobile });
-      setResult(r);
-      setScreen("result");
-    } catch {
-      if (screen === "result") {
-        setResult({ result: "BILLER_UNAVAILABLE", billerId: biller.id, billerName: biller.name, fetchRef: "", responseCode: "SYS500", message: "Biller unavailable" });
+      if (r.result !== "NOT_FOUND") setRecent({ biller, vehicle, mobile });
+      if (r.result === "BILL_DUE") {
+        setDue({ bill: r.bill, fetchRef: r.fetchRef });
+        setScreen("bill");
       } else {
-        setFetchError("Something went wrong while fetching your bill. Please try again.");
+        setInline(r);
       }
+    } catch {
+      setFetchError("Something went wrong while fetching your bill. Try again.");
     } finally {
       setFetching(false);
     }
   }
 
   async function doPay(mode: PaymentMode, simulateFailure: boolean) {
-    if (!result || result.result !== "BILL_DUE" || paying) return;
-    const amountPaise = result.bill.amountPaise;
+    if (!due || paying) return;
+    const amountPaise = due.bill.amountPaise;
     setPaying(true);
     try {
-      const [res] = await Promise.all([
-        couPay({ fetchRef: result.fetchRef, amountPaise, mode, simulateFailure }),
-        sleep(800),
-      ]);
+      const [res] = await Promise.all([couPay({ fetchRef: due.fetchRef, amountPaise, mode, simulateFailure }), sleep(800)]);
       setReceipt(
         res.status === "SUCCESS"
           ? { kind: "success", receipt: res.receipt, couOrderId: res.couOrderId }
           : { kind: "failed", message: res.message, couOrderId: res.couOrderId, amountPaise },
       );
     } catch {
-      setReceipt({
-        kind: "failed",
-        message: "We couldn't complete the payment. Please try again.",
-        amountPaise,
-      });
+      setReceipt({ kind: "failed", message: "We couldn't complete the payment. Try again.", amountPaise });
     } finally {
       setPaying(false);
       setPayOpen(false);
@@ -87,7 +126,8 @@ export function CouApp() {
 
   function done() {
     setReceipt(null);
-    setResult(null);
+    setDue(null);
+    setInline(null);
     setFetchError(null);
     setScreen("details");
   }
@@ -98,12 +138,14 @@ export function CouApp() {
     content = (
       <BillersScreen
         state={billers}
+        recent={recent}
         onBack={() => setScreen("home")}
         onRetry={loadBillers}
-        onPick={(b) => {
-          setBiller(b);
-          setFetchError(null);
-          setScreen("details");
+        onPick={openDetails}
+        onPickRecent={(r) => {
+          setVehicle(r.vehicle);
+          setMobile(r.mobile);
+          openDetails(r.biller);
         }}
       />
     );
@@ -113,39 +155,31 @@ export function CouApp() {
         biller={biller}
         vehicle={vehicle}
         mobile={mobile}
-        setVehicle={setVehicle}
-        setMobile={setMobile}
+        setVehicle={editVehicle}
+        setMobile={editMobile}
         fetching={fetching}
         error={fetchError}
+        inline={inline}
         onBack={() => setScreen("billers")}
         onFetch={doFetch}
-      />
-    );
-  else if (screen === "result" && result)
-    content = (
-      <ResultScreen
-        result={result}
-        vehicle={vehicle}
-        refetching={fetching}
-        onBack={() => setScreen("details")}
-        onPay={() => setPayOpen(true)}
-        onRefetch={doFetch}
         onViewReceipt={(r) => {
           setReceipt({ kind: "success", receipt: r });
           setScreen("receipt");
         }}
       />
     );
+  else if (screen === "bill" && due)
+    content = <BillScreen bill={due.bill} onBack={() => setScreen("details")} onPay={() => setPayOpen(true)} />;
   else if (screen === "receipt" && receipt)
     content = (
       <ReceiptScreen
         view={receipt}
         onDone={done}
         onRetry={
-          receipt.kind === "failed"
+          receipt.kind === "failed" && due
             ? () => {
                 setReceipt(null);
-                setScreen("result");
+                setScreen("bill");
                 setPayOpen(true);
               }
             : undefined
@@ -154,12 +188,16 @@ export function CouApp() {
     );
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-canvas min-[480px]:h-[800px] min-[480px]:w-[390px] min-[480px]:rounded-[2rem] min-[480px]:border-8 min-[480px]:border-ink min-[480px]:shadow-card">
+    // Phone: full screen. Wider screens: a 390×800 phone frame, zoomed down evenly to fit the window.
+    <div
+      style={frameZoom < 1 ? { zoom: frameZoom } : undefined}
+      className="relative h-dvh w-full overflow-hidden bg-pay-canvas min-[480px]:h-[800px] min-[480px]:w-[390px] min-[480px]:rounded-[2.5rem] min-[480px]:border-[10px] min-[480px]:border-ink min-[480px]:shadow-card"
+    >
       {content}
-      {payOpen && result?.result === "BILL_DUE" && (
+      {payOpen && due && (
         <PaySheet
-          amountPaise={result.bill.amountPaise}
-          billerName={result.bill.billerName}
+          amountPaise={due.bill.amountPaise}
+          billerName={due.bill.billerName}
           paying={paying}
           onClose={() => setPayOpen(false)}
           onPay={doPay}

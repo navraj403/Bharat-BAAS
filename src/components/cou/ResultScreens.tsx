@@ -1,9 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
-import type { BillPresentment, FetchResult, Receipt } from "@/lib/domain/types";
-import { Button, Pill, Screen } from "./ui";
+import { useState } from "react";
+import type { BillPresentment, Receipt } from "@/lib/domain/types";
 import { formatINR } from "@/lib/domain/money";
+import { formatCycle } from "@/lib/domain/cycle";
+import { BharatConnect, Button, Card, FOCUS, Pill, Screen } from "./ui";
+import { Icon } from "./icons";
 import { MODE_LABEL, displayVehicle, formatDate, formatDateTime } from "./format";
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
@@ -15,192 +17,167 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-function BillDue({ bill }: { bill: BillPresentment }) {
-  return (
-    <>
-      <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs text-ink-muted">{bill.billerName}</p>
-            <p className="text-lg font-bold text-ink">{bill.customerName}</p>
-          </div>
-          {bill.overdue && <Pill tone="danger">Overdue</Pill>}
-        </div>
-        <dl className="mt-2 divide-y divide-line">
-          <Row label="Vehicle" value={displayVehicle(bill.vehicleRegNo)} />
-          <Row label="Plan" value={bill.planName} />
-          <Row label="Bill period" value={`${formatDate(bill.billPeriod.from)} – ${formatDate(bill.billPeriod.to)}`} />
-          <Row label="Due date" value={formatDate(bill.dueDate)} />
-        </dl>
-      </div>
+// ─── Bill due → confirm ──────────────────────────────────────────────────────
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-        <h2 id="bill-breakdown-heading" className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">
-          Bill breakdown
-        </h2>
-        <table className="w-full text-sm" aria-labelledby="bill-breakdown-heading">
-          <tbody className="divide-y divide-line">
-            {bill.lines.map((l, i) => (
-              <tr key={`${l.kind}-${l.cycle}-${i}`}>
-                <th
-                  scope="row"
-                  className={`px-4 py-2.5 text-left font-normal ${
-                    l.kind === "LATE_FEE" ? "text-danger" : l.kind === "ARREARS" ? "text-warning" : "text-ink"
-                  }`}
-                >
-                  {l.label}
-                </th>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-ink">
-                  {formatINR(l.amountPaise)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-line-strong bg-surface-2">
-              <th scope="row" className="px-4 py-3 text-left text-base font-bold text-ink">
-                Total
-              </th>
-              <td className="whitespace-nowrap px-4 py-3 text-right text-base font-bold tabular-nums text-ink">
-                {formatINR(bill.amountPaise)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </>
-  );
-}
-
-function Notice({
-  tone,
-  icon,
-  title,
-  children,
-}: {
-  tone: "neutral" | "success" | "danger";
-  icon: string;
-  title: string;
-  children: ReactNode;
-}) {
-  const bg = { neutral: "bg-info-soft", success: "bg-success-soft", danger: "bg-danger-soft" }[tone];
-  const fg = { neutral: "text-info", success: "text-success", danger: "text-danger" }[tone];
-  return (
-    <div role={tone === "danger" ? "alert" : undefined} className={`rounded-xl p-5 text-center ${bg}`}>
-      <div
-        aria-hidden="true"
-        className={`mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white text-2xl ${fg}`}
-      >
-        {icon}
-      </div>
-      <h2 className={`text-lg font-bold ${fg}`}>{title}</h2>
-      <div className="mt-1 text-sm text-ink">{children}</div>
-    </div>
-  );
-}
-
-export function ResultScreen({
-  result,
-  vehicle,
-  refetching,
+export function BillScreen({
+  bill,
   onBack,
   onPay,
-  onRefetch,
-  onViewReceipt,
 }: {
-  result: FetchResult;
-  vehicle: string;
-  refetching: boolean;
+  bill: BillPresentment;
   onBack: () => void;
   onPay: () => void;
-  onRefetch: () => void;
-  onViewReceipt: (r: Receipt) => void;
 }) {
-  let body: ReactNode;
-  let footer: ReactNode;
-
-  switch (result.result) {
-    case "BILL_DUE":
-      body = <BillDue bill={result.bill} />;
-      footer = <Button onClick={onPay}>Pay {formatINR(result.bill.amountPaise)}</Button>;
-      break;
-    case "NOT_GENERATED":
-      body = (
-        <Notice tone="neutral" icon="🕒" title="No bill yet">
-          <p>
-            No bill generated yet for {displayVehicle(result.vehicleRegNo)}. Bills are generated on the 1st of each
-            month.
-          </p>
-          <p className="mt-2 text-ink-muted">Next bill: {formatDate(result.nextBillDate)}</p>
-        </Notice>
-      );
-      footer = (
-        <Button variant="secondary" loading={refetching} onClick={onRefetch}>
-          Check again
-        </Button>
-      );
-      break;
-    case "ALREADY_PAID": {
-      const r = result.receipt;
-      body = (
-        <>
-          <Notice tone="success" icon="✓" title="Already paid">
-            <p>
-              Paid {formatINR(r.amountPaise)} on {formatDate(r.paidAt)}. You have nothing due.
-            </p>
-          </Notice>
-          <dl className="mt-4 divide-y divide-line rounded-xl border border-line bg-surface px-4">
-            <Row label="Biller" value={r.billerName} />
-            <Row label="Bharat Connect ref" value={r.bbpsTxnRef} mono />
-            <Row label="Paid via" value={MODE_LABEL[r.mode] ?? r.mode} />
-          </dl>
-        </>
-      );
-      footer = (
-        <Button variant="success" onClick={() => onViewReceipt(r)}>
-          View receipt
-        </Button>
-      );
-      break;
-    }
-    case "NOT_FOUND":
-      body = (
-        <Notice tone="danger" icon="!" title="Account not found">
-          <p>
-            We couldn&apos;t find an account for this vehicle and mobile number with {result.billerName}. Check the
-            details and try again.
-          </p>
-        </Notice>
-      );
-      footer = <Button onClick={onBack}>Edit details</Button>;
-      break;
-    default:
-      body = (
-        <Notice tone="danger" icon="!" title="Biller not responding">
-          <p>{result.billerName ?? "The biller"} is not responding right now. Please try again in a moment.</p>
-        </Notice>
-      );
-      footer = (
-        <Button loading={refetching} onClick={onRefetch}>
-          Try again
-        </Button>
-      );
-  }
+  const [open, setOpen] = useState(true);
+  const hasArrears = bill.arrearsPaise > 0 || bill.lateFeePaise > 0;
 
   return (
     <Screen
-      title={result.result === "BILL_DUE" ? "Your bill" : `Bill · ${displayVehicle(vehicle)}`}
+      title="Bill details"
       onBack={onBack}
-      footer={footer}
+      footer={<Button onClick={onPay}>Pay {formatINR(bill.amountPaise)}</Button>}
     >
-      {body}
+      <Card className="text-center">
+        <p className="text-xs text-ink-muted">
+          {bill.customerName} · {displayVehicle(bill.vehicleRegNo)}
+        </p>
+        <p className="my-1 text-3xl font-bold tabular-nums text-ink">{formatINR(bill.amountPaise)}</p>
+        {bill.overdue ? (
+          <Pill tone="danger">{hasArrears ? "Includes overdue bill" : "Overdue"}</Pill>
+        ) : (
+          <Pill tone="pay">Due {formatDate(bill.dueDate)}</Pill>
+        )}
+        <p className="mt-2 text-xs text-ink-muted">
+          {bill.billerName} · {bill.planName} plan · {formatDate(bill.billPeriod.from)} – {formatDate(bill.billPeriod.to)}
+        </p>
+      </Card>
+
+      <Card className="mt-3 p-0">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-controls="bill-breakdown"
+          className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-sm font-semibold text-ink ${FOCUS}`}
+        >
+          Bill breakdown
+          <Icon name={open ? "chevronUp" : "chevronDown"} className="size-4 text-ink-muted" />
+        </button>
+        {open && (
+          <table id="bill-breakdown" className="w-full text-sm">
+            <caption className="sr-only">Bill breakdown</caption>
+            <tbody className="divide-y divide-line border-t border-line">
+              {bill.lines.map((l, i) => (
+                <tr key={`${l.kind}-${l.cycle}-${i}`}>
+                  <th
+                    scope="row"
+                    className={`px-3 py-2 text-left font-normal ${
+                      l.kind === "LATE_FEE" || l.kind === "ARREARS" ? "text-danger" : "text-ink"
+                    }`}
+                  >
+                    {l.label}
+                  </th>
+                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink">
+                    {formatINR(l.amountPaise)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-line-strong">
+                <th scope="row" className="px-3 py-3 text-left font-bold text-ink">
+                  Total
+                </th>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-bold tabular-nums text-ink">
+                  {formatINR(bill.amountPaise)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+      </Card>
+      <div className="mt-3">
+        <BharatConnect label="Bill fetched via Bharat Connect" />
+      </div>
     </Screen>
   );
 }
 
+// ─── Receipt ─────────────────────────────────────────────────────────────────
+
 export type ReceiptView =
   | { kind: "success"; receipt: Receipt; couOrderId?: string }
   | { kind: "failed"; message: string; couOrderId?: string; amountPaise: number };
+
+function receiptText(r: Receipt, orderId?: string): string {
+  return [
+    "DemoPay receipt (prototype, no real payment)",
+    `Paid ${formatINR(r.amountPaise)} to ${r.billerName}`,
+    `Vehicle: ${displayVehicle(r.vehicleRegNo)}`,
+    `Paid for: ${r.cycles.map(formatCycle).join(" + ")}`,
+    `Bharat Connect ref: ${r.bbpsTxnRef}`,
+    orderId ? `DemoPay order: ${orderId}` : null,
+    `Mode: ${MODE_LABEL[r.mode] ?? r.mode}`,
+    `Time: ${formatDateTime(r.paidAt)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function ReceiptActions({ receipt, orderId }: { receipt: Receipt; orderId?: string }) {
+  const [copied, setCopied] = useState(false);
+  const text = receiptText(receipt, orderId);
+
+  async function share() {
+    try {
+      if (navigator.share) await navigator.share({ title: "Payment receipt", text });
+      else {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+      }
+    } catch {
+      // Share sheet dismissed: nothing to do.
+    }
+  }
+
+  function download() {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `receipt-${receipt.bbpsTxnRef}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const btn = `flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-pay-line bg-surface py-3 text-sm font-semibold text-pay hover:bg-pay-soft ${FOCUS}`;
+  return (
+    <div className="mt-3 flex gap-2">
+      <button type="button" onClick={share} className={btn}>
+        <Icon name="share" className="size-4" /> {copied ? "Copied" : "Share"}
+      </button>
+      <button type="button" onClick={download} className={btn}>
+        <Icon name="download" className="size-4" /> Receipt
+      </button>
+    </div>
+  );
+}
+
+function Hero({ tone, title, amountPaise, sub }: { tone: "success" | "danger"; title: string; amountPaise: number; sub: string }) {
+  return (
+    <div className={`shrink-0 px-4 pb-6 pt-8 text-center text-white ${tone === "success" ? "bg-success" : "bg-danger"}`}>
+      <span
+        className={`mx-auto mb-2 flex size-14 items-center justify-center rounded-full bg-white ${
+          tone === "success" ? "text-success" : "text-danger"
+        }`}
+      >
+        <Icon name={tone === "success" ? "check" : "x"} className="size-8" />
+      </span>
+      <h1 className="text-base font-semibold">{title}</h1>
+      <p className="mt-1 text-3xl font-bold tabular-nums">{formatINR(amountPaise)}</p>
+      <p className="mt-1 text-sm text-white/90">{sub}</p>
+    </div>
+  );
+}
 
 export function ReceiptScreen({
   view,
@@ -213,45 +190,56 @@ export function ReceiptScreen({
 }) {
   if (view.kind === "failed") {
     return (
-      <Screen
-        title="Payment failed"
-        footer={
-          <div className="space-y-2">
-            {onRetry && <Button onClick={onRetry}>Try again</Button>}
-            <Button variant="secondary" onClick={onDone}>
-              Done
-            </Button>
-          </div>
-        }
-      >
-        <Notice tone="danger" icon="✕" title="Payment failed">
-          <p>{view.message}</p>
-          <p className="mt-2 text-ink-muted">You have not been charged. Amount: {formatINR(view.amountPaise)}</p>
-        </Notice>
-        {view.couOrderId && (
-          <dl className="mt-4 divide-y divide-line rounded-xl border border-line bg-surface px-4">
-            <Row label="DemoPay order" value={view.couOrderId} mono />
-          </dl>
-        )}
-      </Screen>
+      <div className="flex h-full flex-col bg-pay-canvas">
+        <Hero tone="danger" title="Payment failed" amountPaise={view.amountPaise} sub="You haven't been charged" />
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <Card>
+            <p className="text-sm text-ink">{view.message}</p>
+            {view.couOrderId && (
+              <dl className="mt-2 border-t border-line">
+                <Row label="DemoPay order" value={view.couOrderId} mono />
+              </dl>
+            )}
+          </Card>
+        </div>
+        <div className="shrink-0 space-y-2 border-t border-pay-line bg-surface p-3">
+          {onRetry && <Button onClick={onRetry}>Try again</Button>}
+          <Button variant="secondary" onClick={onDone}>
+            Done
+          </Button>
+        </div>
+      </div>
     );
   }
+
   const r = view.receipt;
   const orderId = view.couOrderId ?? r.couOrderId;
   return (
-    <Screen title="Receipt" footer={<Button onClick={onDone}>Done</Button>}>
-      <Notice tone="success" icon="✓" title="Paid">
-        <p className="text-2xl font-bold">{formatINR(r.amountPaise)}</p>
-        <p className="text-ink-muted">to {r.billerName}</p>
-      </Notice>
-      <dl className="mt-4 divide-y divide-line rounded-xl border border-line bg-surface px-4">
-        <Row label="Biller" value={r.billerName} />
-        <Row label="Vehicle" value={displayVehicle(r.vehicleRegNo)} />
-        <Row label="Bharat Connect ref" value={r.bbpsTxnRef} mono />
-        {orderId && <Row label="DemoPay order" value={orderId} mono />}
-        <Row label="Paid via" value={MODE_LABEL[r.mode] ?? r.mode} />
-        <Row label="Time" value={formatDateTime(r.paidAt)} />
-      </dl>
-    </Screen>
+    <div className="flex h-full flex-col bg-pay-canvas">
+      <Hero
+        tone="success"
+        title="Payment successful"
+        amountPaise={r.amountPaise}
+        sub={`to ${r.billerName} · ${formatDateTime(r.paidAt)}`}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <Card>
+          <dl className="divide-y divide-line">
+            <Row label="Bharat Connect ref" value={r.bbpsTxnRef} mono />
+            <Row label="Vehicle" value={displayVehicle(r.vehicleRegNo)} />
+            {r.cycles.length > 0 && <Row label="Paid for" value={r.cycles.map(formatCycle).join(" + ")} />}
+            <Row label="Mode" value={MODE_LABEL[r.mode] ?? r.mode} />
+            {orderId && <Row label="DemoPay order" value={orderId} mono />}
+          </dl>
+        </Card>
+        <ReceiptActions receipt={r} orderId={orderId} />
+        <div className="mt-3">
+          <BharatConnect label="Paid via Bharat Connect" />
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-pay-line bg-surface p-3">
+        <Button onClick={onDone}>Done</Button>
+      </div>
+    </div>
   );
 }
