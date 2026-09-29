@@ -41,7 +41,7 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
               aria-label="Help & support"
               className="flex size-8 items-center justify-center rounded-full hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
-              <Icon name="help" />
+              <Icon name="support" />
             </button>
             <span className="flex gap-3" aria-hidden="true">
               <Icon name="bell" />
@@ -118,6 +118,21 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
             <span className="block text-xs text-pay">Pay-per-km BaaS bills, now on Bharat Connect</span>
           </span>
           <Icon name="chevron" className="size-4 text-pay" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onHelp}
+          className={`flex w-full items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left ${FOCUS}`}
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pay-soft text-pay">
+            <Icon name="support" className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">Help &amp; support</span>
+            <span className="block text-xs text-ink-muted">Raise a complaint about a payment · Track your tickets</span>
+          </span>
+          <Icon name="chevron" className="size-4 text-ink-faint" />
         </button>
       </div>
       <BharatConnect />
