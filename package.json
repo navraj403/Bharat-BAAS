@@ -9,7 +9,13 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "test:int": "vitest run --mode int",
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "db:migrate": "node --env-file=.env.local scripts/db-migrate.mjs",
+    "db:seed": "node --env-file=.env.local scripts/db-seed.mjs",
+    "db:gen-seed": "node scripts/db-gen-seed.mjs",
+    "db:verify": "node --env-file=.env.local scripts/db-verify.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "next": "16.3.6",
