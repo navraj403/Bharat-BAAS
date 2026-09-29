@@ -1,9 +1,9 @@
 /**
  * COU (DemoPay customer app backend): PUBLIC API. Owner: agent C.
- * Signatures are FINAL (P0). Implement the bodies; do not change the signatures.
- * Route handlers under src/app/api/cou/** call these. The COU reaches the switch only through
- * `parties/nbbl/api.ts` (via its own client.ts). COU id: `DEMOPAY`. Order ids: `DP-` + 10 [A-Z0-9].
+ * Signatures are FINAL (P0). The COU reaches the switch only through `parties/nbbl/api.ts`.
+ * COU id: `DEMOPAY`. Order ids: `DP-` + 10 [A-Z0-9].
  */
+import { sql } from "@/lib/db/client";
 import type {
   BillerSummary,
   Category,
@@ -12,34 +12,102 @@ import type {
   FetchResult,
   PayResult,
 } from "@/lib/domain/types";
+import * as nbbl from "@/lib/parties/nbbl/api";
+import { newOrderId, normaliseVehicleNo } from "./util";
+
+const COU_ID = "DEMOPAY";
+
+/** Thrown for invalid input; routes map it to 400. */
+export class BadRequestError extends Error {
+  override name = "BadRequestError";
+}
 
 /** `GET /api/cou/billers?category=EV_BAAS`. Proxied from `nbbl/api.listBillers`. */
 export async function listBillers(category: Category): Promise<BillerSummary[]> {
-  void category;
-  throw new Error("NotImplemented");
+  return nbbl.listBillers(category);
 }
 
-/**
- * `POST /api/cou/fetch`. Validate (vehicleNo non-empty after normalising, mobile /^\d{10}$/;
- * otherwise throw, and the route maps it to 400), normalise vehicleNo, call
- * `nbbl/api.billFetch({couId: 'DEMOPAY', billerId, category: 'EV_BAAS',
- * customerParams: {vehicleRegNo, registeredMobile: mobile}})` and return the response unchanged.
- */
+/** `POST /api/cou/fetch`. Validates, normalises, and passes the NBBL response through. */
 export async function fetchBill(req: CouFetchRequest): Promise<FetchResult> {
-  void req;
-  throw new Error("NotImplemented");
+  const vehicleRegNo = normaliseVehicleNo(req.vehicleNo);
+  if (!vehicleRegNo) throw new BadRequestError("Vehicle number is required");
+  if (!/^\d{10}$/.test(String(req.mobile ?? ""))) {
+    throw new BadRequestError("Mobile must be 10 digits");
+  }
+  if (!req.billerId) throw new BadRequestError("Biller is required");
+  return nbbl.billFetch({
+    couId: COU_ID,
+    billerId: req.billerId,
+    category: "EV_BAAS",
+    customerParams: { vehicleRegNo, registeredMobile: req.mobile },
+  });
 }
 
-/**
- * `POST /api/cou/pay`. Insert cou_payments INITIATED (new order id).
- * - simulateFailure → FAILED, failureReason PAYMENT_DECLINED, responseCode null; NBBL NOT called.
- * - Else `nbbl/api.billPay({couId, fetchRef, amountPaise, mode, couOrderId})`:
- *   SUCCESS → cou_payments SUCCESS (bbps_txn_ref, biller_id, vehicle_reg_no) and the receipt with
- *   `couOrderId` set; FAILED → cou_payments FAILED, failureReason BILLER_UNAVAILABLE if SYS500,
- *   else BBPS_REJECTED.
- * cou_payments.biller_id / vehicle_reg_no are nullable: fill them from the receipt on success.
- */
+/** `POST /api/cou/pay`. simulateFailure never calls NBBL. */
 export async function pay(req: CouPayRequest): Promise<PayResult> {
-  void req;
-  throw new Error("NotImplemented");
+  if (!req.fetchRef) throw new BadRequestError("fetchRef is required");
+  if (!Number.isInteger(req.amountPaise) || req.amountPaise <= 0) {
+    throw new BadRequestError("amountPaise must be a positive integer");
+  }
+  if (!req.mode) throw new BadRequestError("mode is required");
+
+  const couOrderId = newOrderId();
+  await sql`insert into cou_payments (order_id, fetch_ref, amount_paise, mode, status)
+    values (${couOrderId}, ${req.fetchRef}, ${req.amountPaise}, ${req.mode}, 'INITIATED')`;
+
+  if (req.simulateFailure) {
+    await sql`update cou_payments set status = 'FAILED', updated_at = now() where order_id = ${couOrderId}`;
+    return {
+      status: "FAILED",
+      couOrderId,
+      failureReason: "PAYMENT_DECLINED",
+      responseCode: null,
+      bbpsTxnRef: null,
+      message: "Payment declined by your bank (simulated)",
+    };
+  }
+
+  let res;
+  try {
+    res = await nbbl.billPay({
+      couId: COU_ID,
+      fetchRef: req.fetchRef,
+      amountPaise: req.amountPaise,
+      mode: req.mode,
+      couOrderId,
+    });
+  } catch {
+    await sql`update cou_payments set status = 'FAILED', updated_at = now() where order_id = ${couOrderId}`;
+    return {
+      status: "FAILED",
+      couOrderId,
+      failureReason: "BILLER_UNAVAILABLE",
+      responseCode: "SYS500",
+      bbpsTxnRef: null,
+      message: "Biller unavailable",
+    };
+  }
+
+  if (res.status === "SUCCESS" && res.receipt) {
+    await sql`update cou_payments set status = 'SUCCESS', bbps_txn_ref = ${res.bbpsTxnRef},
+      biller_id = ${res.receipt.billerId}, vehicle_reg_no = ${res.receipt.vehicleRegNo},
+      updated_at = now() where order_id = ${couOrderId}`;
+    return {
+      status: "SUCCESS",
+      couOrderId,
+      responseCode: "000",
+      receipt: { ...res.receipt, couOrderId },
+    };
+  }
+
+  await sql`update cou_payments set status = 'FAILED', bbps_txn_ref = ${res.bbpsTxnRef},
+    updated_at = now() where order_id = ${couOrderId}`;
+  return {
+    status: "FAILED",
+    couOrderId,
+    failureReason: res.responseCode === "SYS500" ? "BILLER_UNAVAILABLE" : "BBPS_REJECTED",
+    responseCode: res.responseCode,
+    bbpsTxnRef: res.bbpsTxnRef,
+    message: res.message,
+  };
 }
