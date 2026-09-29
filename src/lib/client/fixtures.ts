@@ -78,6 +78,7 @@ import {
   newCouTicketNo,
   normaliseDescription,
   summariseComplaints,
+  triageNote,
 } from "@/lib/domain/complaints";
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
@@ -861,7 +862,7 @@ function seedComplaints(s: Store, now: number): void {
     },
     [
       ["RAISED", null, null, "DEMOPAY", meeraDesc, 4 * DAY_MS],
-      ["ASSIGNED", null, "BILLER", ACTOR_SYSTEM, "Auto-triage: paid bill not posted, pending with the biller.", 4 * DAY_MS - 1000],
+      ["ASSIGNED", null, "BILLER", ACTOR_SYSTEM, triageNote("PAID_BILL_PENDING", "SUCCESS"), 4 * DAY_MS - 1000],
     ],
   );
   add(
@@ -873,7 +874,7 @@ function seedComplaints(s: Store, now: number): void {
     },
     [
       ["RAISED", null, null, "DEMOPAY", "Money left my account but the payment shows failed.", 6 * H],
-      ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, "Auto-triage: the PAY failed at the switch.", 6 * H - 1000],
+      ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, triageNote("DEBITED_TXN_FAILED", "FAILED"), 6 * H - 1000],
     ],
   );
   add(
@@ -885,7 +886,7 @@ function seedComplaints(s: Store, now: number): void {
     },
     [
       ["RAISED", null, null, "DEMOPAY", "The app showed an error while paying.", 20 * H],
-      ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, "Auto-triage: other, pending with Bharat Connect.", 20 * H - 1000],
+      ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, triageNote("OTHER", null), 20 * H - 1000],
       ["ASSIGNED", "NBBL", "COU", "NBBL_OPS", "No PAY reached the switch; DemoPay to check the UPI leg.", 18 * H],
     ],
   );
@@ -898,7 +899,7 @@ function seedComplaints(s: Store, now: number): void {
     },
     [
       ["RAISED", null, null, "DEMOPAY", null, 2.5 * DAY_MS],
-      ["ASSIGNED", null, "BILLER", ACTOR_SYSTEM, "Auto-triage: duplicate payment, pending with the biller.", 2.5 * DAY_MS - 1000],
+      ["ASSIGNED", null, "BILLER", ACTOR_SYSTEM, triageNote("DUPLICATE_PAYMENT", "SUCCESS"), 2.5 * DAY_MS - 1000],
       ["NOTE", null, null, "NBBL_OPS", "Volt Leasing confirms a single credit for BCSEEDPAID01.", 1.5 * DAY_MS],
       ["CLOSED", "BILLER", null, "NBBL_OPS", "Only one debit found; no duplicate.", DAY_MS],
     ],
@@ -975,7 +976,7 @@ export function fixtureRaiseComplaint(req: RaiseComplaintRequest): CouComplaint 
   store.complaints.push(c);
   store.complaintEvents.push(
     { id: store.nextComplaintEventId++, complaintId: c.complaintId, action: "RAISED", fromParty: null, toParty: null, actor: "DEMOPAY", note: description, at },
-    { id: store.nextComplaintEventId++, complaintId: c.complaintId, action: "ASSIGNED", fromParty: null, toParty: pendingWith, actor: ACTOR_SYSTEM, note: "Auto-triage", at },
+    { id: store.nextComplaintEventId++, complaintId: c.complaintId, action: "ASSIGNED", fromParty: null, toParty: pendingWith, actor: ACTOR_SYSTEM, note: triageNote(req.reason, payTxn?.status ?? null), at },
   );
   const ticket: FxCouComplaint = {
     ticketNo: c.couTicketNo, orderId: order.orderId, complaintId: c.complaintId, reason: req.reason, description, createdAt: at,

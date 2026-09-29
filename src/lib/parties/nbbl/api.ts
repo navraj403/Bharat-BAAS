@@ -32,6 +32,7 @@ import { RESPONSE_MESSAGES } from "@/lib/domain/types";
 import {
   ComplaintInputError,
   ComplaintNotFoundError,
+  ComplaintTransitionError,
   applyAction,
   dueAt as complaintDueAt,
   initialAssignee,
@@ -41,7 +42,9 @@ import {
   newComplaintId,
   normaliseDescription,
   summariseComplaints,
+  triageNote,
 } from "@/lib/domain/complaints";
+import { isUniqueViolation } from "@/lib/db/client";
 import * as complaintsRepo from "./complaints-repo";
 import * as repo from "./repo";
 import { maskMobile, newBbpsTxnRef, newFetchRef, normaliseVehicleNo } from "./util";
@@ -363,25 +366,33 @@ export async function raiseComplaint(req: NbblRaiseComplaintRequest): Promise<Nb
   const pendingWith = initialAssignee(req.reason, pay?.status ?? null);
   const createdAt = new Date().toISOString();
   const complaintId = newComplaintId();
-  await complaintsRepo.insertComplaint(
-    {
-      complaintId,
-      couId: req.couId,
-      couTicketNo: req.couTicketNo,
-      orderId: req.orderId,
-      txnRef: pay?.ref ?? null,
-      billerId: pay?.billerId ?? req.billerId,
-      // NBBL stores masked refs only: the PAY txn's, else the (non-sensitive) vehicle reg no.
-      customerRefMasked: pay?.customerRefMasked ?? (req.vehicleRegNo ? normaliseVehicleNo(req.vehicleRegNo) : null),
-      amountPaise: req.amountPaise,
-      reason: req.reason,
-      description,
-      pendingWith,
-      dueAt: complaintDueAt(createdAt, req.reason),
-      createdAt,
-    },
-    "Auto-triage",
-  );
+  try {
+    await complaintsRepo.insertComplaint(
+      {
+        complaintId,
+        couId: req.couId,
+        couTicketNo: req.couTicketNo,
+        orderId: req.orderId,
+        txnRef: pay?.ref ?? null,
+        billerId: pay?.billerId ?? req.billerId,
+        // NBBL stores masked refs only: the PAY txn's, else the (non-sensitive) vehicle reg no.
+        customerRefMasked: pay?.customerRefMasked ?? (req.vehicleRegNo ? normaliseVehicleNo(req.vehicleRegNo) : null),
+        amountPaise: req.amountPaise,
+        reason: req.reason,
+        description,
+        pendingWith,
+        dueAt: complaintDueAt(createdAt, req.reason),
+        createdAt,
+      },
+      triageNote(req.reason, pay?.status ?? null),
+    );
+  } catch (err) {
+    // Race: a concurrent raise inserted the OPEN complaint first (nbbl_complaints_open_uq, 0003).
+    if (!isUniqueViolation(err)) throw err;
+    const winner = await complaintsRepo.findOpenByOrder(req.couId, req.orderId, req.reason);
+    if (winner) return winner;
+    throw err;
+  }
   const created = await complaintsRepo.getComplaint(complaintId);
   if (!created) throw new Error("Complaint vanished after insert");
   return created;
@@ -428,10 +439,19 @@ export async function complaintAction(
   complaintId: string,
   req: ComplaintActionRequest,
 ): Promise<NbblComplaintDetail> {
-  const found = await complaintsRepo.applyLocked(complaintId, (current) => {
-    const { next, event } = applyAction(current, req);
-    return { ...next, event };
-  });
+  let found: boolean;
+  try {
+    found = await complaintsRepo.applyLocked(complaintId, (current) => {
+      const { next, event } = applyAction(current, req);
+      return { ...next, event };
+    });
+  } catch (err) {
+    // REOPEN while a newer OPEN complaint exists for the same (COU, order, reason): nbbl_complaints_open_uq.
+    if (isUniqueViolation(err)) {
+      throw new ComplaintTransitionError("Another open complaint already exists for this order and reason");
+    }
+    throw err;
+  }
   if (!found) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);
   const detail = await getComplaint(complaintId);
   if (!detail) throw new ComplaintNotFoundError(`Complaint ${complaintId} not found`);

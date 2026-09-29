@@ -3,7 +3,7 @@
  * Signatures are FINAL (P0). The COU reaches the switch only through `parties/nbbl/api.ts`.
  * COU id: `DEMOPAY`. Order ids: `DP-` + 10 [A-Z0-9].
  */
-import { sql } from "@/lib/db/client";
+import { isUniqueViolation, sql } from "@/lib/db/client";
 import type {
   BillerSummary,
   Category,
@@ -223,11 +223,19 @@ export async function raiseComplaint(req: RaiseComplaintRequest): Promise<CouCom
   if (existing.length) return toTicket(existing[0], c, order);
 
   // New complaint (c.couTicketNo === ticketNo), or an NBBL-side one whose COU row is missing.
-  const inserted = await sql`insert into cou_complaints (ticket_no, order_id, complaint_id, reason, description)
-    values (${c.couTicketNo}, ${order.order_id}, ${c.complaintId}, ${req.reason}, ${description})
-    on conflict (ticket_no) do update set ticket_no = excluded.ticket_no
-    returning *`;
-  return toTicket(inserted[0], c, order);
+  try {
+    const inserted = await sql`insert into cou_complaints (ticket_no, order_id, complaint_id, reason, description)
+      values (${c.couTicketNo}, ${order.order_id}, ${c.complaintId}, ${req.reason}, ${description})
+      on conflict (ticket_no) do update set ticket_no = excluded.ticket_no
+      returning *`;
+    return toTicket(inserted[0], c, order);
+  } catch (err) {
+    // Race: a concurrent raise already stored the ticket for this complaint (cou_complaints_complaint_uq, 0003).
+    if (!isUniqueViolation(err)) throw err;
+    const winner = await sql`select * from cou_complaints where complaint_id = ${c.complaintId}`;
+    if (winner.length) return toTicket(winner[0], c, order);
+    throw err;
+  }
 }
 
 /** `GET /api/cou/complaints`. COU tickets, newest first, merged with live NBBL status. */

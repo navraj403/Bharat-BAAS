@@ -178,6 +178,28 @@ export function initialAssignee(reason: ComplaintReason, payTxnStatus: NbblTxnSt
   }
 }
 
+/**
+ * The note on the initial ASSIGNED (auto-triage) event: why the complaint is pending with that
+ * party. Mirrors `initialAssignee`; the seed and fixtures use the same wording.
+ */
+export function triageNote(reason: ComplaintReason, payTxnStatus: NbblTxnStatus | null): string {
+  switch (reason) {
+    case "DEBITED_TXN_FAILED":
+      if (payTxnStatus === null) return "Auto-triage: no payment reached Bharat Connect, pending with DemoPay.";
+      if (payTxnStatus === "SUCCESS") return "Auto-triage: Bharat Connect shows the payment successful, pending with the biller.";
+      if (payTxnStatus === "PENDING") return "Auto-triage: the PAY is stuck at the switch, pending with Bharat Connect.";
+      return "Auto-triage: the PAY failed at the switch, pending with Bharat Connect.";
+    case "DUPLICATE_PAYMENT":
+      return "Auto-triage: duplicate payment, pending with the biller.";
+    case "PAID_BILL_PENDING":
+      return "Auto-triage: paid bill not posted, pending with the biller.";
+    case "WRONG_AMOUNT":
+      return "Auto-triage: wrong amount charged, pending with the biller.";
+    case "OTHER":
+      return "Auto-triage: other, pending with Bharat Connect.";
+  }
+}
+
 /** Plain-words assignee for UIs: the biller's name for BILLER when known, else the party label. */
 export function pendingWithLabel(party: ComplaintParty, billerName?: string | null): string {
   if (party === "BILLER" && billerName) return billerName;

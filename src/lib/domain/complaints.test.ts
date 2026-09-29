@@ -17,6 +17,7 @@ import {
   pendingWithLabel,
   slaDays,
   summariseComplaints,
+  triageNote,
 } from "./complaints";
 
 const RAISED = "2026-09-20T10:00:00.000Z";
@@ -167,5 +168,18 @@ describe("ref generators", () => {
   it("deterministic with an rng, and rng=0.999… stays in range", () => {
     expect(newCouTicketNo(() => 0)).toBe("DPT-AAAAAAAA");
     expect(newComplaintId(() => 0.9999999)).toBe("CC9999999999");
+  });
+});
+
+describe("triageNote", () => {
+  it("explains the initial assignee", () => {
+    expect(triageNote("DEBITED_TXN_FAILED", null)).toBe("Auto-triage: no payment reached Bharat Connect, pending with DemoPay.");
+    expect(triageNote("DEBITED_TXN_FAILED", "FAILED")).toContain("pending with Bharat Connect");
+    expect(triageNote("DEBITED_TXN_FAILED", "PENDING")).toContain("pending with Bharat Connect");
+    expect(triageNote("DEBITED_TXN_FAILED", "SUCCESS")).toContain("pending with the biller");
+    expect(triageNote("OTHER", null)).toContain("pending with Bharat Connect");
+  });
+  it("matches the seeded auto-triage note", () => {
+    expect(triageNote("PAID_BILL_PENDING", "SUCCESS")).toBe("Auto-triage: paid bill not posted, pending with the biller.");
   });
 });

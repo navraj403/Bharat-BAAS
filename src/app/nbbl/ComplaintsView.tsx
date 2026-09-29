@@ -160,7 +160,8 @@ function ActionBar({ c, onDone }: { c: NbblComplaintDetail; onDone: (d: NbblComp
 
 function Detail({ id, paused, onViewTxn, onChanged }: { id: string; paused: boolean; onViewTxn: (ref: string) => void; onChanged: () => void }) {
   const detail = useAsync(() => getNbblComplaint(id), id, { intervalMs: 3000, paused });
-  const c = detail.data;
+  // useAsync keeps the previous row's data until the new id loads; show loading, not stale data.
+  const c = detail.data?.complaintId === id ? detail.data : undefined;
   return (
     <Card
       title={

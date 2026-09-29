@@ -3,9 +3,14 @@
 ## Phase C: Complaints
 **State:** DONE
 - **Done:** `scripts/smoke.mjs` gained 9 complaint steps (k1–k9) before the final reset: seeded orders (FAILED `DP-SEED000002`, no ref), seeded `CCSEED000001` OPEN/BILLER/overdue + stats, raise on `DP-SEED000002` (DPT/CC formats, pending COU, due ≈ +5 d), idempotent re-raise, ASSIGN→BILLER + 409 on repeat, NOTE/CLOSE REFUNDED/409 re-close/REOPEN→NBBL/CLOSE, COU My tickets CLOSED/REFUNDED, error codes (404/400/404/400), admin tables list the 3 new tables. `npm run smoke`: 32 passed, 0 failed.
-- **Cross-lane fixes:** none needed; all complaint routes behaved per contract.
-- **Pending:** none.
-- **Files touched:** `scripts/smoke.mjs`, `docs/agents/I.md`.
+- **Cross-lane fixes (smoke):** none needed; all complaint routes behaved per contract.
+- **R review fixes (PM request):**
+  - #1 race-safe raise: new idempotent `supabase/migrations/0003_complaints_unique.sql` (partial unique `nbbl_complaints_open_uq` on (cou_id, order_id, reason) where OPEN; unique `cou_complaints_complaint_uq` on complaint_id). `isUniqueViolation()` (SQLSTATE 23505) in `db/client.ts`; `nbbl/api.raiseComplaint` returns the existing OPEN complaint on 23505, `cou/api.raiseComplaint` returns the existing ticket. Side effect handled: a REOPEN that would create a second OPEN complaint for the same key now maps 23505 → 409 `INVALID_TRANSITION` in `complaintAction`.
+  - #2 `triageNote(reason, payStatus)` in `domain/complaints.ts` (+2 tests), used by `nbbl/api` and the fixtures (seeded fixture notes and in-memory raise); matches the seed.sql wording.
+  - #6 actions route drops `actor` from the body and always passes `ACTOR_NBBL_OPS`.
+  - #7 `ComplaintsView` Detail shows loading until `data.complaintId === id`.
+- **Pending:** PM to apply migration 0003 (`npm run db:migrate`), then re-run `npm run smoke` / `test:int` (not run by me, per PM: shared DB in use).
+- **Files touched:** `scripts/smoke.mjs`, `docs/agents/I.md`, `supabase/migrations/0003_complaints_unique.sql`, `src/lib/db/client.ts`, `src/lib/domain/complaints.ts`, `src/lib/domain/complaints.test.ts`, `src/lib/parties/nbbl/api.ts`, `src/lib/parties/cou/api.ts`, `src/lib/client/fixtures.ts`, `src/app/api/nbbl/complaints/[id]/actions/route.ts`, `src/app/nbbl/ComplaintsView.tsx`.
 
 **Model:** Opus · **Phase:** P2 · **State:** DONE
 **Last update:** 16:40 (end of P2)
