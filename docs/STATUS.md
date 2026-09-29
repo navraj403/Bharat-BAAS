@@ -6,7 +6,7 @@ Phase-level log kept by the PM. Per-agent detail lives in `docs/agents/<id>.md`.
 
 | Gate | Target time | State | Notes |
 |---|---|---|---|
-| G0 Foundation | 0:20 | not started | Waiting for plan approval and Supabase `DATABASE_URL` |
+| G0 Foundation | 0:20 | **in progress** | Plan approved; baseline commit `9a4eba8`. Agent F (Opus) running. `DATABASE_URL` set and verified (PG 17.6, Tokyo pooler); F told to migrate and seed |
 | G1 Parallel build (A–E) | 1:05 | – | |
 | G2 Integration + smoke | 1:30 | – | |
 | G3 QA walkthrough | 1:45 | – | |
