@@ -6,8 +6,17 @@ Phase-level log kept by the PM. Per-agent detail lives in `docs/agents/<id>.md`.
 
 | Gate | Target time | State | Notes |
 |---|---|---|---|
-| G0 Foundation | 0:20 | **in progress** | Plan approved; baseline commit `9a4eba8`. Agent F (Opus) running. `DATABASE_URL` set and verified (PG 17.6, Tokyo pooler); F told to migrate and seed |
-| G1 Parallel build (A–E) | 1:05 | – | |
+| G0 Foundation | 0:20 | **passed** (`e87b35b`) | check 10/10 green, ownership clean, DB seeded and verified to the paisa. PM added optional `vehicleIds` to generate bills |
+| G1 Parallel build (A–E) | 1:05 | **in progress** | Committed: D `1db6d31`, E `a7faa4b`, A `4458fdc`, C `4ac99c9`. B (Biller, Opus) still running; B and C were resumed after an API usage limit |
+
+## PM QA notes (fixture-mode walkthrough on :3001) → for Integrator (P2)
+
+The Arjun journey passed in full: ₹11,889.62 breakdown correct → UPI PIN → receipt `BC…` → re-fetch shows ALREADY_PAID. The landing page, `/oem` and the other consoles return 200 with no console errors. Fix list:
+1. `/cou` details screen has **two "Fetch bill" buttons** (form submit and a footer button). Keep one.
+2. Bill screen shows the heading **"Bill breakdown" twice** (a visible caption plus a heading).
+3. Arrears and late-fee labels show the raw cycle `2026-07`. Format them as `Jul 2026`.
+4. Pay-sheet mode radios and the simulate-failure checkbox have **no accessible names** (they read as "on"). Add labels.
+5. D and E each wrote a local ₹ formatter (`src/components/cou/format.ts`, `src/components/ui/format.ts`). Swap both to `formatINR` from `src/lib/domain/money.ts`.
 | G2 Integration + smoke | 1:30 | – | |
 | G3 QA walkthrough | 1:45 | – | |
 | G4 Deployed URL | 2:00 | – | |
