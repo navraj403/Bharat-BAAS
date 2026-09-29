@@ -3,6 +3,7 @@ import { listVehicles } from "@/lib/parties/oem/api";
 import { handleError } from "../_http";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
   try {

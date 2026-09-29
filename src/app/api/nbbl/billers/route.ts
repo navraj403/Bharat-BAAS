@@ -2,6 +2,7 @@ import { handle, badRequest } from "../_http";
 import { listBillers } from "@/lib/parties/nbbl/api";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export function GET(req: Request) {
   return handle(async () => {

@@ -24,7 +24,7 @@ restart identity cascade;
 -- ─── OEM ────────────────────────────────────────────────────────────────────
 insert into oem_plans (id, name, fixed_fee_paise, rate_paise_per_km) values
   ('STD',  'Standard',              150000, 350),   -- ASSUMPTION: fixed fees are illustrative
-  ('PRO',  'Pro (long-range pack)', 200000, 450),
+  ('PRO',  'Pro (long-range pack)', 200000, 450),   -- ASSUMPTION: PRO/FLEX fees and per-km rates are illustrative
   ('FLEX', 'Flex',                   99900, 400);
 
 insert into oem_vehicles (id, reg_no, vin, model, plan_id, odometer_km, activated_on) values

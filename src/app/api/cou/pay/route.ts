@@ -1,8 +1,8 @@
-import { handle, readJson } from "../../nbbl/_http";
+import { handle, readJson, paymentMode } from "../../nbbl/_http";
 import { pay } from "@/lib/parties/cou/api";
-import type { PaymentMode } from "@/lib/domain/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export function POST(req: Request) {
   return handle(async () => {
@@ -10,7 +10,7 @@ export function POST(req: Request) {
     return pay({
       fetchRef: String(b.fetchRef ?? ""),
       amountPaise: b.amountPaise as number,
-      mode: String(b.mode ?? "") as PaymentMode,
+      mode: paymentMode(b.mode),
       simulateFailure: b.simulateFailure === true,
     });
   });

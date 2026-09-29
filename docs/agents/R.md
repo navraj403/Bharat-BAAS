@@ -1,26 +1,29 @@
-# Agent R: Reviewer
+# Agent R: Phase P3 review (read-only)
 
-**Model:** Sonnet · **Phase:** P3 · **State:** NOT STARTED
-**Last update:** –
+Scope: `git diff 9a4eba8..HEAD -- src scripts supabase`. Every finding below was verified by reading the code. Line numbers are approximate to the cited construct.
 
-## Owns
-- `docs/agents/R.md`
+## Clean areas (checked, no defect found)
+- **Deadlocks:** every `withTx` callback in `biller/service.ts`, `oem/service.ts`, `oem/repo.ts` (insertTrip) and `db/seed.ts` uses only the `tx` handle. No global `sql` and no cross-party api call runs inside a transaction. The OEM is called outside the transaction in `fetchBill`, `sync` and `paymentAdvice`.
+- **Money:** all integer paise. `pct` / `pctBps` / SQL `markOverdue` are half-up. Presentment `amountPaise` is the sum of its lines. `formatINR` is used for UI amounts.
+- **Party isolation:** the only cross-party imports are cou→nbbl/api, nbbl→biller/api, biller→oem/api (via `client.ts`). NBBL stores only masked refs, amounts, codes and `biller_ref`.
+- **SQL and secrets:** `sql.unsafe` in admin uses the static `APP_TABLES` whitelist. In biller `repo.ts` the unsafe SQL is a constant with `$1` params. `DATABASE_URL` is read only in server code. Only `NEXT_PUBLIC_DEMO_MODE`, `NEXT_PUBLIC_USE_FIXTURES` and `NEXT_PUBLIC_SUPABASE_URL` are exposed.
 
-## Done
-- …
+## Findings
 
-## Working on
-- …
+| # | Sev | file:line | Issue | Concrete fix |
+|---|-----|-----------|-------|--------------|
+| 1 | HIGH | `src/app/api/cou/pay/route.ts:5`, `cou/fetch/route.ts`, `vercel.json` (absent) | No `maxDuration` and no function-region config (grep finds neither). `max:1` plus `max_pipeline:0` serialises every query. By reading, a pay is roughly 30 sequential round trips (NBBL ~10 single-statement writes, biller `withTx` ~12, OEM markPaid, COU 2 writes) and a fetch roughly 25. If Vercel runs in a different region from Supabase (~150-250 ms per hop), that is 5-8 s. On timeout the client's `catch` in `CouApp.doPay` shows "couldn't complete the payment" even though the biller already committed. | Add `export const maxDuration = 60` to cou/fetch, cou/pay and admin/reset routes. Add `vercel.json` `{"regions":["<nearest to Supabase>"]}`. Optionally cut hops by batching `logEvent` inserts in NBBL. |
+| 2 | HIGH | `supabase/seed.sql:23` (comments), Riya row due `today+5` | Seed dates are relative to seed time. Five days after the last seed, `markOverdue` (run on every fetch and overview) flips Riya's Aug bill to OVERDUE and adds a 2% late fee (11400). The live demo then shows ₹6,840.00 instead of ₹6,726.00, contradicting the script and acceptance numbers. Arjun's row is already overdue by design. | Runbook: hit reset immediately before every demo (put this in STATUS/README). Optionally seed Riya's due date at `today+25` so it stays stable. |
+| 3 | MEDIUM | `src/app/api/nbbl/_http.ts:47` | `handle()` returns `e.message` on 500 (used by cou, nbbl and admin routes). Postgres errors (column and constraint names, "DATABASE_URL is not set…") reach a public client. The oem and biller `_http` files correctly return a generic message. | Return a fixed `"Internal error"` and keep `console.error(e)`. |
+| 4 | MEDIUM | `src/app/api/admin/reset/route.ts:6`, `src/app/page.tsx:36` | `POST /api/admin/reset` is unauthenticated and the home page has a one-click (confirm-bar) reset button. Any visitor to the public URL can wipe the DB mid-demo. Acceptable for a demo, but flagged. | Cheap guard: require `x-demo-key` equal to an `ADMIN_KEY` env var, or hide the button and route unless `NEXT_PUBLIC_DEMO_MODE=1`. |
+| 5 | MEDIUM | `src/lib/parties/admin/api.ts:44-51` | The DB explorer returns `select *` including `biller_customers.mobile` unmasked, to anyone. The registered mobile is the second factor for fetch, and every other surface masks it (§2). | In `getTableRows`, mask any column named `mobile` with the same `98XXXXXX01` pattern (or exclude it). |
+| 6 | MEDIUM | `src/lib/parties/cou/api.ts:56`, `src/app/api/nbbl/bill-pay/route.ts:10` | `mode` is only checked as non-empty. NBBL calls `biller.paymentAdvice` directly, so the `MODES` whitelist in the biller route is bypassed. Arbitrary strings are stored in `cou_payments.mode` and `biller_payments.mode` and echoed in receipts. | Validate against `["UPI","UPI_AUTOPAY","NETBANKING","DEBIT_CARD"]` in `cou.pay` and in the nbbl route (throw `BadRequestError`). |
+| 7 | MEDIUM | `src/lib/parties/nbbl/api.ts:118-170`, `src/components/cou/CouApp.tsx:80` | No per-`fetchRef` idempotency. A retry after a network or timeout error where the biller had already committed (see #1), or a second tab, creates a second PAY txn. It returns FAILED/BPR002 ("not payable") for money already collected, and the FAILED txn lowers the NBBL success-rate KPI. The in-UI double-click guard is fine (React flushes discrete events). | In `billPay`, look up an existing SUCCESS PAY for `fetchRef` and short-circuit. Or in the CouApp catch path, re-fetch (which shows ALREADY_PAID) instead of offering a blind retry. |
+| 8 | LOW | `src/lib/parties/nbbl/api.ts:167-171` | `repo.logEvent`/`closeTxn` after `ADVICE_ACK` are not guarded. If the DB blips there, the route returns 500 after the biller committed, so the COU shows FAILED while money is collected and the PAY txn is stuck PENDING. | Wrap the post-ack bookkeeping in try/catch and still return the SUCCESS response. |
+| 9 | LOW | `src/lib/parties/biller/service.ts:5-12` (header), `service.ts:sync` | The comment claims an OEM `markPaid` failure is "repaired by any retry". Only an identical advice retry re-sends it. `sync` and `fetch` never do (`upsertReceivables` skips PAID rows), so the OEM console can show UNPAID for a paid bill permanently. | In `sync`, for receivables PAID locally whose OEM bill is UNPAID, call `oemMarkPaid`. Or drop the claim from the comment. |
+| 10 | LOW | `src/components/ui/format.ts:20` | `currentCycle()` uses browser-local month. OEM/DB use UTC (`now()`, `toISOString`). Between 00:00 and 05:30 IST on the 1st, the OEM console defaults to a cycle one month off from the server's. | Derive from `new Date().toISOString().slice(0,7)`. |
+| 11 | LOW | `src/lib/parties/cou/api.ts:64`, `src/app/api/cou/pay/route.ts:13` | `simulateFailure` is honoured in production regardless of `NEXT_PUBLIC_DEMO_MODE` (which only hides the checkbox). There are no limits on `cou_payments` inserts (any fetchRef string), so a bot can grow the table. | Ignore `simulateFailure` unless `process.env.DEMO_MODE==="1"` server-side. Require `fetchRef` to match `/^F-[A-Z0-9]{10}$/`. |
+| 12 | LOW | `src/lib/parties/biller/rules.ts:66`, `rules.ts:17-20`, `fixtures.ts:56` | `rupees()` formats via `Intl` with `paise/100` (display-only float) instead of `formatINR`. GST/late-fee bps are also defined in three places (billing.ts, rules.ts, fixtures.ts). They match today but can drift. | Use `formatINR`. Import the constants from one module (or add a unit test asserting equality). |
+| 13 | LOW | `src/lib/parties/oem/service.ts:15`, `supabase/seed.sql:27-28`, `rules.ts:nextBillDate` | Missing `// ASSUMPTION:` tags: `MAX_TRIP_KM = 10_000`, the PRO/FLEX fees and all per-km rates (only the STD row is tagged), and "bills generate on the 1st" (`nextBillDate`). GST/late fee/due days/fixed-fee-no-prorate are tagged. | Add the tags. |
 
-## Pending / cut
-- …
-
-## Files touched
-- …
-
-## Contract questions (for the PM; don't edit types.ts or api.ts signatures yourself)
-- none
-
-## Verification
-- `npm run check`: <pass/fail>
-- other: …
+Counts: BLOCKER 0 · HIGH 2 · MEDIUM 5 · LOW 6.

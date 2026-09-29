@@ -13,6 +13,7 @@ import type {
 import { withTx } from "@/lib/db/client";
 import * as repo from "./repo";
 
+// ASSUMPTION: a single trip is capped at 10,000 km (sanity bound; not from the domain spec).
 const MAX_TRIP_KM = 10_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

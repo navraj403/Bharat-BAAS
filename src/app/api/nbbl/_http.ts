@@ -1,5 +1,6 @@
 /** Shared route helpers for the nbbl/cou/admin API folders. */
 import { NextResponse } from "next/server";
+import { PAYMENT_MODES, type PaymentMode } from "@/lib/domain/types";
 
 export class HttpError extends Error {
   constructor(
@@ -16,6 +17,14 @@ export const badRequest = (m: string) => new HttpError(400, "BAD_REQUEST", m);
 export function errorResponse(status: number, code: string, message: string) {
   return NextResponse.json({ error: { code, message } }, { status });
 }
+
+/** Validate `mode` against the PaymentMode union or throw 400. */
+export const paymentMode = (v: unknown): PaymentMode => {
+  if (typeof v !== "string" || !(PAYMENT_MODES as readonly string[]).includes(v)) {
+    throw badRequest(`mode must be one of ${PAYMENT_MODES.join(", ")}`);
+  }
+  return v as PaymentMode;
+};
 
 /** Parse a JSON object body or throw 400. */
 export async function readJson(req: Request): Promise<Record<string, unknown>> {
@@ -43,6 +52,6 @@ export async function handle(fn: () => Promise<unknown>): Promise<Response> {
       return errorResponse(400, "BAD_REQUEST", e.message);
     }
     console.error(e);
-    return errorResponse(500, "INTERNAL", e instanceof Error ? e.message : "Internal error");
+    return errorResponse(500, "INTERNAL", "Internal error");
   }
 }

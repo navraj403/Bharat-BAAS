@@ -3,6 +3,7 @@ import { overview } from "@/lib/parties/biller/api";
 import { errorResponse, handleError } from "../_http";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** `GET /api/biller/overview?billerId=` → BillerOverview (unknown biller → 404). */
 export async function GET(req: NextRequest) {

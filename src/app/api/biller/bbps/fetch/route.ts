@@ -3,6 +3,7 @@ import { fetchBill } from "@/lib/parties/biller/api";
 import { errorResponse, handleError, isStr, readJsonObject } from "../../_http";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** BOU-facing fetch (called by NBBL). Business outcomes (incl. NOT_FOUND) are HTTP 200. */
 export async function POST(req: Request) {

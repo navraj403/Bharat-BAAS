@@ -50,8 +50,18 @@ export async function getTableRows(name: string): Promise<AdminTableRows | null>
     party,
     table,
     columns,
-    rows: rows.map((r) => jsonSafe(r) as Record<string, JsonValue>),
+    rows: rows.map((r) => {
+      const o = jsonSafe(r) as Record<string, JsonValue>;
+      if (typeof o.mobile === "string") o.mobile = maskMobileLocal(o.mobile);
+      return o;
+    }),
   };
+}
+
+/** `9800000001` -> `98XXXXXX01` (local copy: admin must not import another party). */
+function maskMobileLocal(m: string): string {
+  if (m.length < 5) return "X".repeat(m.length);
+  return m.slice(0, 2) + "X".repeat(m.length - 4) + m.slice(-2);
 }
 
 /** `POST /api/admin/reset`. Truncate + seed. */

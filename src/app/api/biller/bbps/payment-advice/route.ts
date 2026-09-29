@@ -4,6 +4,7 @@ import { paymentAdvice } from "@/lib/parties/biller/api";
 import { errorResponse, handleError, isStr, readJsonObject } from "../../_http";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const MODES: readonly PaymentMode[] = ["UPI", "UPI_AUTOPAY", "NETBANKING", "DEBIT_CARD"];
 

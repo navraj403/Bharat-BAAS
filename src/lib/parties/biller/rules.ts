@@ -14,6 +14,7 @@ import type {
 } from "@/lib/domain/types";
 import { formatCycle } from "@/lib/domain/cycle";
 
+// Source of truth: src/lib/domain/billing.ts (GST_BPS / LATE_FEE_BPS); keep these in sync.
 // ASSUMPTION: GST 18% on the OEM bill (the OEM computes it; the biller only labels it).
 export const GST_BPS = 1800;
 // ASSUMPTION: late fee = 2% of an overdue bill's SUBTOTAL, one-time, no GST (docs/DOMAIN.md §4).
@@ -54,6 +55,7 @@ export function cyclePeriod(cycle: Cycle): { from: IsoDate; to: IsoDate } {
   return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, "0")}` };
 }
 
+// ASSUMPTION: bills are generated on the 1st of each month.
 /** 1st of the month after `today` (bills are generated on day 1 for the previous month). */
 export function nextBillDate(today: IsoDate): IsoDate {
   const [y, m] = today.split("-").map(Number);

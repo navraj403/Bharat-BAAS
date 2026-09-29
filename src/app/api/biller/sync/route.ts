@@ -3,6 +3,7 @@ import { sync } from "@/lib/parties/biller/api";
 import { errorResponse, handleError, isStr, readJsonObject } from "../_http";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** `POST /api/biller/sync {billerId}` → {synced} (unknown biller → 404). */
 export async function POST(req: Request) {

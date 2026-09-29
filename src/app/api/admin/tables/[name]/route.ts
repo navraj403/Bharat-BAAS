@@ -2,6 +2,7 @@ import { handle, HttpError } from "../../../nbbl/_http";
 import { getTableRows } from "@/lib/parties/admin/api";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export function GET(_req: Request, ctx: { params: Promise<{ name: string }> }) {
   return handle(async () => {

@@ -53,3 +53,10 @@
 - `npm run db:seed`: done after the last smoke and int run.
 - `node scripts/check-ownership.mjs`: `M src/lib/db/client.ts [F]`, `M src/lib/db/seed.ts [F]` → "OK: 2 changed file(s), all within owned lanes." (the other edits were already committed by the PM)
 - `npm run build`: not run (dev server is live; the PM runs it at the gate).
+
+## P3 fixes
+- R HIGH-1: `vercel.json` (regions hnd1); `export const maxDuration = 60;` added to every `src/app/api/**/route.ts` (Next 16 route segment config).
+- R #3: `nbbl/_http.ts` `handle()` now returns generic "Internal error" on 500 (still `console.error`). oem/biller `_http` already generic; left as is.
+- R #6: `PAYMENT_MODES` const added (additive) to `domain/types.ts`; `paymentMode()` helper in `nbbl/_http.ts` used by `cou/pay` and `nbbl/bill-pay` routes -> 400 BAD_REQUEST.
+- R #5: `admin/api.ts` masks `mobile` column (local helper; no cross-party import).
+- R #13/#12: ASSUMPTION tags (MAX_TRIP_KM in oem/service.ts, PRO/FLEX in seed.sql, nextBillDate in biller/rules.ts); source-of-truth comments for GST/late-fee in biller/rules.ts and client/fixtures.ts.

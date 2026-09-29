@@ -53,6 +53,7 @@ import { formatCycle } from "@/lib/domain/cycle";
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
 const DAY_MS = 86_400_000;
+// Source of truth: src/lib/domain/billing.ts (GST_BPS / LATE_FEE_BPS); keep in sync.
 const GST_BPS = 1800; // ASSUMPTION: GST 18% (fixture mirror of billing.ts)
 const LATE_FEE_BPS = 200; // ASSUMPTION: late fee 2% of subtotal, once, no GST
 const DUE_DAYS = 10; // ASSUMPTION: due = bill date + 10 days

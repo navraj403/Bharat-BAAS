@@ -2,6 +2,7 @@ import { handle, HttpError } from "../../_http";
 import { getTransaction } from "@/lib/parties/nbbl/api";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export function GET(_req: Request, ctx: { params: Promise<{ ref: string }> }) {
   return handle(async () => {

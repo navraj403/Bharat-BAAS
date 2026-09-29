@@ -2,6 +2,7 @@ import { handle, readJson } from "../../nbbl/_http";
 import { fetchBill } from "@/lib/parties/cou/api";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export function POST(req: Request) {
   return handle(async () => {

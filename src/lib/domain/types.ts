@@ -48,6 +48,9 @@ export type PlanId = "STD" | "PRO" | "FLEX";
 /** Mock payment modes. */
 export type PaymentMode = "UPI" | "UPI_AUTOPAY" | "NETBANKING" | "DEBIT_CARD";
 
+/** Runtime list of every `PaymentMode` (single source for input validation). */
+export const PAYMENT_MODES: readonly PaymentMode[] = ["UPI", "UPI_AUTOPAY", "NETBANKING", "DEBIT_CARD"];
+
 /**
  * Mock BBPS response codes (docs/DOMAIN.md §5 + BFR003).
  * - `000`    success (fetch: a bill is due; pay: payment accepted)

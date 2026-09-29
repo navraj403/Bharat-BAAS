@@ -2,6 +2,7 @@ import { handle, readJson, str, badRequest } from "../_http";
 import { billFetch } from "@/lib/parties/nbbl/api";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export function POST(req: Request) {
   return handle(async () => {
