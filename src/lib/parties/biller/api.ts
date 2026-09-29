@@ -21,6 +21,7 @@ import type {
   PaymentAdvice,
   PaymentAdviceAck,
 } from "@/lib/domain/types";
+import * as service from "./service";
 
 /**
  * `POST /api/biller/bbps/fetch` (BOU-facing; called by NBBL).
@@ -36,8 +37,7 @@ import type {
  * Seed acceptance: Riya 672600, Arjun 1188962, Meera ALREADY_PAID 1218350, Kabir NOT_GENERATED.
  */
 export async function fetchBill(req: BillerFetchRequest): Promise<BillerFetchResponse> {
-  void req;
-  throw new Error("NotImplemented");
+  return service.fetchBill(req.billerId, req.vehicleNo, req.mobile);
 }
 
 /**
@@ -50,18 +50,15 @@ export async function fetchBill(req: BillerFetchRequest): Promise<BillerFetchRes
  *   with the Receipt.
  */
 export async function paymentAdvice(advice: PaymentAdvice): Promise<PaymentAdviceAck> {
-  void advice;
-  throw new Error("NotImplemented");
+  return service.paymentAdvice(advice);
 }
 
 /** `GET /api/biller/overview?billerId=`. KPIs + customers + receivables + payments. Unknown id → throw (404). */
 export async function overview(billerId: string): Promise<BillerOverview> {
-  void billerId;
-  throw new Error("NotImplemented");
+  return service.overview(billerId);
 }
 
 /** `POST /api/biller/sync {billerId}`. Runs syncFromOem for every customer of the biller. */
 export async function sync(billerId: string): Promise<BillerSyncResponse> {
-  void billerId;
-  throw new Error("NotImplemented");
+  return service.sync(billerId);
 }
