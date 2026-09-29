@@ -229,10 +229,10 @@ export function addOemTrip(vehicleId: string, km: Km): Promise<OemVehicleRow> {
   return request("POST", `/api/oem/vehicles/${encodeURIComponent(vehicleId)}/trips`, { km });
 }
 
-/** `POST /api/oem/bills/generate {cycle}` */
-export function generateOemBills(cycle: Cycle): Promise<GenerateBillsResponse> {
-  if (USE_FIXTURES) return fixture(() => fx.fixtureGenerateBills(cycle));
-  return request("POST", "/api/oem/bills/generate", { cycle });
+/** `POST /api/oem/bills/generate {cycle, vehicleIds?}`; pass `vehicleIds` to bill specific vehicles only. */
+export function generateOemBills(cycle: Cycle, vehicleIds?: string[]): Promise<GenerateBillsResponse> {
+  if (USE_FIXTURES) return fixture(() => fx.fixtureGenerateBills(cycle, vehicleIds));
+  return request("POST", "/api/oem/bills/generate", vehicleIds ? { cycle, vehicleIds } : { cycle });
 }
 
 /** `GET /api/oem/bills?regNo=` (all bills when regNo is omitted) */

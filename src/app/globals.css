@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Bharat BaaS theme tokens (P0, agent F). Agent E may APPEND below; don't rename tokens.
+ * Light console theme: neutral surfaces + one accent (a generic Bharat Connect-ish deep blue,
+ * with a saffron highlight for "New"/brand marks). No real logos or brand assets.
+ * Use as Tailwind utilities: bg-canvas, bg-surface, text-ink, text-ink-muted, border-line,
+ * bg-accent, text-accent, bg-accent-soft, text-success, bg-success-soft, etc.
+ */
+@theme {
+  /* Fonts (Geist variables are set in layout.tsx) */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* Neutrals */
+  --color-canvas: #f6f7f9;        /* page background */
+  --color-surface: #ffffff;       /* cards, tables */
+  --color-surface-2: #f0f2f5;     /* table headers, subtle fills */
+  --color-line: #e2e5ea;          /* borders, dividers */
+  --color-line-strong: #c9ced6;
+  --color-ink: #151a23;           /* primary text */
+  --color-ink-muted: #5b6474;     /* secondary text */
+  --color-ink-faint: #8a93a3;     /* hints, placeholders */
+
+  /* Accent (primary actions, links, active nav) */
+  --color-accent: #1d4ed8;
+  --color-accent-hover: #1e40af;
+  --color-accent-soft: #e8efff;
+  --color-accent-ink: #ffffff;    /* text on accent */
+
+  /* Brand highlight (the generic "B" mark, "New" badges) */
+  --color-brand: #f08a24;
+  --color-brand-soft: #fff1e3;
+
+  /* Status (pills: PAID/SUCCESS, UNPAID/PENDING, OVERDUE/FAILED, info) */
+  --color-success: #15803d;
+  --color-success-soft: #e7f6ec;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3e2;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fdecec;
+  --color-info: #0e7490;
+  --color-info-soft: #e5f6f9;
+
+  /* Shape */
+  --radius-card: 0.75rem;
+  --radius-pill: 9999px;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

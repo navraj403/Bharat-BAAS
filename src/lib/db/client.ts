@@ -15,7 +15,7 @@
  * - `uuid[]` params: `sql.array(ids, 'uuid')` or `${ids}::uuid[]`.
  * - Columns come back snake_case; map to the camelCase DTOs explicitly in repo code.
  */
-import postgres from "postgres";
+import postgres, { type TransactionSql } from "postgres";
 
 /** OID of the Postgres `date` type. */
 const DATE_OID = 1082;
@@ -42,7 +42,7 @@ function createSql(url: string) {
 /** The configured client type (includes the custom `date` parser). */
 export type Db = ReturnType<typeof createSql>;
 /** A transaction handle, as passed to `withTx` callbacks. */
-export type Tx = Parameters<Parameters<Db["begin"]>[0]>[0];
+export type Tx = TransactionSql<{ date: string }>;
 
 const globalForDb = globalThis as typeof globalThis & { __bharatBaasSql?: Db };
 

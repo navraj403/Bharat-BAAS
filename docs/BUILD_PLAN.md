@@ -121,7 +121,7 @@ Vehicle numbers are **normalised** to uppercase with spaces and dashes removed (
 |---|---|
 | `/` | Landing: a 4-party diagram with one link per party plus the demo script. **Reset demo data** button |
 | `/cou` | The customer app above, in the phone frame |
-| `/oem` | Vehicles table (reg no, model, plan, odometer, **km this cycle**, last bill status). "+100 km" / "+500 km" / custom km per row. **Generate bills for {cycle}** (cycle picker, defaults to the current month). Bills table |
+| `/oem` | Vehicles table (reg no, model, plan, odometer, **km this cycle**, last bill status). "+100 km" / "+500 km" / custom km per row, plus a per-row **Generate bill** button (calls generate with `[vehicleId]`; **this is the button used in the demo**). A bulk **Generate bills for {cycle}** (cycle picker, defaults to the current month) sits behind a confirm, because it also bills Riya, Arjun and Meera for the current month. Bills table |
 | `/biller` | Biller switcher (Demo Finance / Volt Leasing). KPI tiles (receivables due, collected, overdue count). Customers table. Receivables table (status pills UNPAID / OVERDUE / PAID). Payments table with BBPS ref. **Sync from OEM** |
 | `/nbbl` | KPI tiles (fetches, payments, success rate, value processed). Transactions table (ref, type, biller, COU, masked customer ref, amount, response code, latency). Click a row to see the **hop timeline** (COU_REQ → BILLER_REQ → BILLER_RESP → COU_RESP with JSON payloads). Auto-refresh every 3 s. "Disputes: Phase 2" tab (disabled) |
 | `/admin/db` | Table list grouped by party with row counts. Click a table to see its rows (read-only, newest first, 100 max). Link to the Supabase Table Editor |
@@ -210,7 +210,7 @@ RLS stays **off**. The app connects server-side only, with no anon access. Befor
 | Biller | `POST /api/biller/sync` | `{billerId}` → `{synced:number}` |
 | OEM | `GET /api/oem/vehicles` | → `OemVehicleRow[]` |
 | OEM | `POST /api/oem/vehicles/:id/trips` | `{km}` → `OemVehicleRow` |
-| OEM | `POST /api/oem/bills/generate` | `{cycle}` → `{generated: OemBill[]}` |
+| OEM | `POST /api/oem/bills/generate` | `{cycle, vehicleIds?}` → `{generated: OemBill[]}`. With `vehicleIds`, only those vehicles are billed (per-row button; the demo uses this for Kabir) |
 | OEM | `GET /api/oem/bills?regNo=` | → `OemBill[]` (for the biller pull, and for the console) |
 | Admin | `GET /api/admin/tables` / `GET /api/admin/tables/:name` | → `{party, table, rows:number}[]` / `{columns, rows}` (whitelisted table names only) |
 | Admin | `POST /api/admin/reset` | → `{ok:true}` (truncate + seed) |

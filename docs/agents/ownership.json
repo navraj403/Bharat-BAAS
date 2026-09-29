@@ -1,0 +1,76 @@
+{
+  "_comment": "Agent id -> globs it may edit (docs/BUILD_PLAN.md §9). Checked by scripts/check-ownership.mjs. '*' = one path segment, '**' = any depth, '{a,b}' = alternatives. I (integrator) may edit anything.",
+  "PM": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    ".gitignore",
+    ".claude/**",
+    "docs/STATUS.md",
+    "docs/BUILD_PLAN.md",
+    "docs/DOMAIN.md",
+    "docs/agents/_TEMPLATE.md"
+  ],
+  "F": [
+    "src/lib/domain/types.ts",
+    "src/lib/db/**",
+    "src/lib/client/**",
+    "src/lib/parties/*/api.ts",
+    "supabase/**",
+    "scripts/db-*.mjs",
+    "scripts/check-ownership.mjs",
+    "docs/agents/ownership.json",
+    "docs/agents/{A,B,C,D,E,F,I,R}.md",
+    "package.json",
+    "package-lock.json",
+    ".env.example",
+    "next.config.ts",
+    "src/app/globals.css",
+    "vitest.config.mts"
+  ],
+  "A": [
+    "src/lib/domain/money.ts",
+    "src/lib/domain/billing.ts",
+    "src/lib/domain/*.test.ts",
+    "src/lib/parties/oem/**",
+    "src/app/api/oem/**",
+    "docs/agents/A.md"
+  ],
+  "B": [
+    "src/lib/parties/biller/**",
+    "src/app/api/biller/**",
+    "docs/agents/B.md"
+  ],
+  "C": [
+    "src/lib/parties/nbbl/**",
+    "src/lib/parties/cou/**",
+    "src/lib/parties/admin/**",
+    "src/app/api/nbbl/**",
+    "src/app/api/cou/**",
+    "src/app/api/admin/**",
+    "docs/agents/C.md"
+  ],
+  "D": [
+    "src/app/cou/**",
+    "src/components/cou/**",
+    "docs/agents/D.md"
+  ],
+  "E": [
+    "src/app/layout.tsx",
+    "src/app/page.tsx",
+    "src/app/oem/**",
+    "src/app/biller/**",
+    "src/app/nbbl/**",
+    "src/app/admin/**",
+    "src/components/ui/**",
+    "src/components/consoles/**",
+    "src/app/globals.css",
+    "docs/agents/E.md"
+  ],
+  "I": [
+    "**"
+  ],
+  "R": [
+    "docs/agents/R.md"
+  ]
+}

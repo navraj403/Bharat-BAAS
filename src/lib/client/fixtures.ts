@@ -715,12 +715,13 @@ export function fixtureAddTrip(vehicleId: string, km: number): OemVehicleRow {
   return vehicleRow(v);
 }
 
-export function fixtureGenerateBills(cycle: Cycle): { generated: OemBill[] } {
+export function fixtureGenerateBills(cycle: Cycle, vehicleIds?: string[]): { generated: OemBill[] } {
   if (!/^\d{4}-\d{2}$/.test(cycle)) throw new Error("cycle must be YYYY-MM");
   const from = cycleStart(cycle).toISOString();
   const to = new Date(cycleEnd(cycle).getTime() + DAY_MS).toISOString();
   const generated: OemBill[] = [];
   for (const v of store.vehicles) {
+    if (vehicleIds && !vehicleIds.includes(v.id)) continue;
     if (v.activatedOn > isoDate(cycleEnd(cycle))) continue;
     if (store.bills.some((b) => b.vehicleId === v.id && b.cycle === cycle)) continue;
     const km = store.trips.filter((t) => t.vehicleId === v.id && t.recordedAt >= from && t.recordedAt < to).reduce((s, t) => s + t.km, 0);

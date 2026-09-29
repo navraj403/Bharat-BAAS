@@ -53,11 +53,19 @@ export async function addTrip(vehicleId: string, km: Km): Promise<OemVehicleRow>
  * calendar month (0 km still bills the fixed fee). Idempotent per (vehicle, cycle): re-running
  * returns only newly created bills (empty array if none). `cycle` must match /^\d{4}-\d{2}$/.
  *
- * Demo note: generating the CURRENT month also bills Riya/Arjun/Meera (their current-month
- * trips + fixed fee). Kabir (activated this month, +1,600 km) → ₹8,378.00.
+ * `vehicleIds` (optional, PM addition at Gate 0): when given, only those vehicles are considered
+ * (same eligibility and idempotency rules); unknown ids are ignored. The demo uses this per row
+ * so that billing Kabir does not also bill Riya/Arjun/Meera for the current month.
+ *
+ * Demo note: generating the CURRENT month WITHOUT `vehicleIds` also bills Riya/Arjun/Meera (their
+ * current-month trips + fixed fee). Kabir (activated this month, +1,600 km) → ₹8,378.00.
  */
-export async function generateBills(cycle: Cycle): Promise<GenerateBillsResponse> {
+export async function generateBills(
+  cycle: Cycle,
+  vehicleIds?: string[],
+): Promise<GenerateBillsResponse> {
   void cycle;
+  void vehicleIds;
   throw new Error("NotImplemented");
 }
 

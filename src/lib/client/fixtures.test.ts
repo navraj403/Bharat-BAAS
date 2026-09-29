@@ -57,7 +57,8 @@ describe("fixtures reproduce BUILD_PLAN §4", () => {
     if (!kabir) throw new Error("no Kabir");
     expect(kabir.kmThisCycle).toBe(0);
     fixtureAddTrip(kabir.id, 1600);
-    const { generated } = fixtureGenerateBills(kabir.currentCycle);
+    const { generated } = fixtureGenerateBills(kabir.currentCycle, [kabir.id]);
+    expect(generated).toHaveLength(1); // per-vehicle generation must not bill Riya/Arjun/Meera
     expect(generated.find((b) => b.regNo === "MH01AB1004")?.totalPaise).toBe(837800);
     const r = fixtureFetch(KABIR);
     if (r.result !== "BILL_DUE") throw new Error(r.result);

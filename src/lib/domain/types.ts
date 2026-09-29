@@ -594,6 +594,8 @@ export interface AddTripRequest {
 /** `POST /api/oem/bills/generate`. */
 export interface GenerateBillsRequest {
   cycle: Cycle;
+  /** Optional: bill only these OEM vehicle ids (the console's per-row "Generate bill"). Omitted = all eligible vehicles. */
+  vehicleIds?: string[];
 }
 export interface GenerateBillsResponse {
   generated: OemBill[];
