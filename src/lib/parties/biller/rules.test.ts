@@ -39,8 +39,8 @@ function bill(p: Partial<OemBill> & Pick<OemBill, "id" | "cycle" | "kmDriven">):
 
 const ctx = {
   presentmentId: "p1",
-  billerId: "demo-finance",
-  billerName: "Demo Finance",
+  billerId: "bajaj-finance",
+  billerName: "Bajaj Finance",
   customerName: "Arjun Mehta",
   vehicleRegNo: "MH01AB1002",
   planNames: { FLEX: "Flex" },

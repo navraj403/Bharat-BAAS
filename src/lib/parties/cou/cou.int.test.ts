@@ -47,13 +47,13 @@ describe("cou", () => {
   });
 
   it("validates fetch input", async () => {
-    await expect(fetchBill({ billerId: "demo-finance", vehicleNo: " - ", mobile: "9800000001" })).rejects.toThrow();
-    await expect(fetchBill({ billerId: "demo-finance", vehicleNo: "MH01AB1001", mobile: "123" })).rejects.toThrow();
+    await expect(fetchBill({ billerId: "bajaj-finance", vehicleNo: " - ", mobile: "9800000001" })).rejects.toThrow();
+    await expect(fetchBill({ billerId: "bajaj-finance", vehicleNo: "MH01AB1001", mobile: "123" })).rejects.toThrow();
   });
 
   it("fetch -> pay success writes cou_payments and returns receipt", async () => {
     fetchBillMock.mockResolvedValue(due);
-    const f = await fetchBill({ billerId: "demo-finance", vehicleNo: "mh 01 ab 1001", mobile: "9800000001" });
+    const f = await fetchBill({ billerId: "bajaj-finance", vehicleNo: "mh 01 ab 1001", mobile: "9800000001" });
     fetchRefs.push(f.fetchRef);
     expect(f.responseCode).toBe("000");
     expect(fetchBillMock.mock.calls[0][0].vehicleNo).toBe("MH01AB1001");
@@ -68,8 +68,8 @@ describe("cou", () => {
         billerPaymentId: "bp",
         receipt: {
           bbpsTxnRef: a.bbpsTxnRef,
-          billerId: "demo-finance",
-          billerName: "Demo Finance",
+          billerId: "bajaj-finance",
+          billerName: "Bajaj Finance",
           vehicleRegNo: "MH01AB1001",
           customerName: "T****",
           amountPaise: a.amountPaise,
@@ -88,7 +88,7 @@ describe("cou", () => {
     expect(row).toMatchObject({
       status: "SUCCESS",
       bbps_txn_ref: r.receipt.bbpsTxnRef,
-      biller_id: "demo-finance",
+      biller_id: "bajaj-finance",
       vehicle_reg_no: "MH01AB1001",
     });
   });
@@ -112,12 +112,12 @@ describe("cou", () => {
 
   it("biller down on fetch -> SYS500 passthrough; on pay -> BILLER_UNAVAILABLE", async () => {
     fetchBillMock.mockRejectedValue(new Error("down"));
-    const f = await fetchBill({ billerId: "demo-finance", vehicleNo: "MH01AB1001", mobile: "9800000001" });
+    const f = await fetchBill({ billerId: "bajaj-finance", vehicleNo: "MH01AB1001", mobile: "9800000001" });
     fetchRefs.push(f.fetchRef);
     expect(f).toMatchObject({ result: "BILLER_UNAVAILABLE", responseCode: "SYS500" });
 
     fetchBillMock.mockResolvedValue(due);
-    const f2 = await fetchBill({ billerId: "demo-finance", vehicleNo: "MH01AB1001", mobile: "9800000001" });
+    const f2 = await fetchBill({ billerId: "bajaj-finance", vehicleNo: "MH01AB1001", mobile: "9800000001" });
     fetchRefs.push(f2.fetchRef);
     paymentAdviceMock.mockRejectedValue(new Error("down"));
     const r = await pay({ fetchRef: f2.fetchRef, amountPaise: 70000, mode: "UPI" });

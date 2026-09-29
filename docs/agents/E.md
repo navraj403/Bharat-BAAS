@@ -23,7 +23,7 @@ src/app/layout.tsx, page.tsx, oem/**, biller/**, nbbl/**, admin/**, src/componen
 - listed under Owns
 
 ## Contract questions
-- none. Assumed biller ids `demo-finance` / `volt-leasing` (from fixtures). NbblStats.successRate handled as 0-1 or 0-100.
+- none. Assumed biller ids `bajaj-finance` / `volt-leasing` (from fixtures). NbblStats.successRate handled as 0-1 or 0-100.
 
 ## Verification
 - typecheck: pass; lint: pass

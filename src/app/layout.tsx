@@ -24,6 +24,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col overflow-x-hidden">
         <TopNav />
         {children}
+        <footer className="mt-auto border-t border-black/10 px-4 py-2 text-center text-xs text-neutral-600">
+          Hackathon prototype. Not affiliated with or endorsed by Maruti Suzuki, Bajaj Finance, NPCI or NBBL.
+          All data is fictional and no real payments are made.
+        </footer>
       </body>
     </html>
   );

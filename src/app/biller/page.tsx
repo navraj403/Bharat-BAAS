@@ -8,7 +8,7 @@ import { Notice, PageHeader, errMsg } from "@/components/consoles/PageShell";
 import { useAsync } from "@/components/consoles/useAsync";
 
 const BILLERS = [
-  { id: "demo-finance", name: "Demo Finance" },
+  { id: "bajaj-finance", name: "Bajaj Finance" },
   { id: "volt-leasing", name: "Volt Leasing" },
 ];
 

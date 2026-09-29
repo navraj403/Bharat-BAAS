@@ -1,5 +1,5 @@
 /**
- * Biller (BaaS financier: Demo Finance, Volt Leasing; BOU folded in): PUBLIC API. Owner: agent B.
+ * Biller (BaaS financier: Bajaj Finance, Volt Leasing; BOU folded in): PUBLIC API. Owner: agent B.
  * Signatures are FINAL (P0). Implement the bodies; do not change the signatures.
  * NBBL may import ONLY this file from `parties/biller`. The biller reaches the OEM only through
  * `parties/oem/api.ts` (via its own client.ts).

@@ -28,10 +28,10 @@ insert into oem_plans (id, name, fixed_fee_paise, rate_paise_per_km) values
   ('FLEX', 'Flex',                   99900, 400);
 
 insert into oem_vehicles (id, reg_no, vin, model, plan_id, odometer_km, activated_on) values
-  ('11111111-0000-4000-8000-000000000001', 'MH01AB1001', 'SMEVDEMO000001001', 'Sample Motors Aura EV (sedan)', 'STD',   9380, (date_trunc('month', current_date) - interval '8 months')::date),
-  ('11111111-0000-4000-8000-000000000002', 'MH01AB1002', 'SMEVDEMO000001002', 'Sample Motors Nova EV (hatch)', 'FLEX',  8150, (date_trunc('month', current_date) - interval '6 months')::date),
-  ('11111111-0000-4000-8000-000000000003', 'MH01AB1003', 'SMEVDEMO000001003', 'Sample Motors Terra EV (SUV)',  'PRO',  14170, (date_trunc('month', current_date) - interval '10 months')::date),
-  ('11111111-0000-4000-8000-000000000004', 'MH01AB1004', 'SMEVDEMO000001004', 'Sample Motors Aura EV (sedan)', 'STD',     12, date_trunc('month', current_date)::date);
+  ('11111111-0000-4000-8000-000000000001', 'MH01AB1001', 'SMEVDEMO000001001', 'Maruti Suzuki e Vitara (Delta)', 'STD',   9380, (date_trunc('month', current_date) - interval '8 months')::date),
+  ('11111111-0000-4000-8000-000000000002', 'MH01AB1002', 'SMEVDEMO000001002', 'Maruti Suzuki e Vitara (Zeta)', 'FLEX',  8150, (date_trunc('month', current_date) - interval '6 months')::date),
+  ('11111111-0000-4000-8000-000000000003', 'MH01AB1003', 'SMEVDEMO000001003', 'Maruti Suzuki e Vitara (Alpha)',  'PRO',  14170, (date_trunc('month', current_date) - interval '10 months')::date),
+  ('11111111-0000-4000-8000-000000000004', 'MH01AB1004', 'SMEVDEMO000001004', 'Maruti Suzuki e Vitara (Delta)', 'STD',     12, date_trunc('month', current_date)::date);
 
 -- Trips. Previous month ("Aug") and two months ago ("Jul") match the bills below.
 -- Current month: small running totals for Riya/Arjun/Meera; Kabir has 0 km (no trips).
@@ -88,26 +88,26 @@ insert into oem_bills (id, bill_no, vehicle_id, plan_id, cycle, km_driven, fixed
 
 -- ─── Biller ─────────────────────────────────────────────────────────────────
 insert into biller_billers (id, name, category) values
-  ('demo-finance', 'Demo Finance', 'EV_BAAS'),
+  ('bajaj-finance', 'Bajaj Finance', 'EV_BAAS'),
   ('volt-leasing', 'Volt Leasing', 'EV_BAAS');
 
 insert into biller_customers (id, biller_id, name, mobile, vehicle_reg_no, contract_id, created_at) values
-  ('33333333-0000-4000-8000-000000000001', 'demo-finance', 'Riya Sharma', '9800000001', 'MH01AB1001', 'DF-BAAS-0001', now() - interval '8 months'),
-  ('33333333-0000-4000-8000-000000000002', 'demo-finance', 'Arjun Mehta', '9800000002', 'MH01AB1002', 'DF-BAAS-0002', now() - interval '6 months'),
+  ('33333333-0000-4000-8000-000000000001', 'bajaj-finance', 'Riya Sharma', '9800000001', 'MH01AB1001', 'BF-BAAS-0001', now() - interval '8 months'),
+  ('33333333-0000-4000-8000-000000000002', 'bajaj-finance', 'Arjun Mehta', '9800000002', 'MH01AB1002', 'BF-BAAS-0002', now() - interval '6 months'),
   ('33333333-0000-4000-8000-000000000003', 'volt-leasing', 'Meera Iyer',  '9800000003', 'MH01AB1003', 'VL-BAAS-0001', now() - interval '10 months'),
-  ('33333333-0000-4000-8000-000000000004', 'demo-finance', 'Kabir Khan',  '9800000004', 'MH01AB1004', 'DF-BAAS-0003', date_trunc('month', now()));
+  ('33333333-0000-4000-8000-000000000004', 'bajaj-finance', 'Kabir Khan',  '9800000004', 'MH01AB1004', 'BF-BAAS-0003', date_trunc('month', now()));
 
 -- Receivables = bills already synced from the OEM. Arjun's Jul bill is OVERDUE with its
 -- one-time late fee applied (2% × 459900 = 9198). Meera's is PAID.
 insert into biller_receivables (id, biller_id, customer_id, oem_bill_id, cycle, subtotal_paise, gst_paise, total_paise,
                                 due_date, status, late_fee_paise, synced_at, paid_payment_id) values
-  ('44444444-0000-4000-8000-000000000001', 'demo-finance', '33333333-0000-4000-8000-000000000001', '22222222-0000-4000-8000-000000000001',
+  ('44444444-0000-4000-8000-000000000001', 'bajaj-finance', '33333333-0000-4000-8000-000000000001', '22222222-0000-4000-8000-000000000001',
    to_char(date_trunc('month', current_date) - interval '1 month', 'YYYY-MM'), 570000, 102600, 672600,
    current_date + 5, 'UNPAID', 0, now() - interval '4 days', null),
-  ('44444444-0000-4000-8000-000000000002', 'demo-finance', '33333333-0000-4000-8000-000000000002', '22222222-0000-4000-8000-000000000002',
+  ('44444444-0000-4000-8000-000000000002', 'bajaj-finance', '33333333-0000-4000-8000-000000000002', '22222222-0000-4000-8000-000000000002',
    to_char(date_trunc('month', current_date) - interval '2 months', 'YYYY-MM'), 459900, 82782, 542682,
    current_date - 25, 'OVERDUE', 9198, now() - interval '4 days', null),
-  ('44444444-0000-4000-8000-000000000003', 'demo-finance', '33333333-0000-4000-8000-000000000002', '22222222-0000-4000-8000-000000000003',
+  ('44444444-0000-4000-8000-000000000003', 'bajaj-finance', '33333333-0000-4000-8000-000000000002', '22222222-0000-4000-8000-000000000003',
    to_char(date_trunc('month', current_date) - interval '1 month', 'YYYY-MM'), 539900, 97182, 637082,
    current_date + 5, 'UNPAID', 0, now() - interval '4 days', null),
   ('44444444-0000-4000-8000-000000000004', 'volt-leasing', '33333333-0000-4000-8000-000000000003', '22222222-0000-4000-8000-000000000004',
@@ -164,7 +164,7 @@ insert into biller_payments (id, biller_id, presentment_id, bbps_txn_ref, amount
 
 -- ─── NBBL (registry + Meera's FETCH/PAY so the monitor is not empty) ────────
 insert into nbbl_billers (id, name, category, status) values
-  ('demo-finance', 'Demo Finance', 'EV_BAAS', 'ACTIVE'),
+  ('bajaj-finance', 'Bajaj Finance', 'EV_BAAS', 'ACTIVE'),
   ('volt-leasing', 'Volt Leasing', 'EV_BAAS', 'ACTIVE');
 
 insert into nbbl_transactions (ref, type, cou_id, biller_id, category, customer_ref_masked, amount_paise, status,

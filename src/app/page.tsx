@@ -10,12 +10,12 @@ import { Notice, errMsg } from "@/components/consoles/PageShell";
 const PARTIES = [
   { href: "/cou", name: "COU", sub: "DemoPay", role: "Customer app: pick biller, fetch the bill, pay via mock UPI." },
   { href: "/nbbl", name: "NBBL", sub: "Bharat Connect switch", role: "Routes fetch and pay, issues BBPS refs, logs every hop." },
-  { href: "/biller", name: "Biller", sub: "Demo Finance / Volt Leasing", role: "Pulls bills from the OEM, adds arrears and late fee, takes payment." },
-  { href: "/oem", name: "OEM", sub: "Sample Motors", role: "Records km from telematics and generates the monthly bill." },
+  { href: "/biller", name: "Biller", sub: "Bajaj Finance / Volt Leasing", role: "Pulls bills from the OEM, adds arrears and late fee, takes payment." },
+  { href: "/oem", name: "OEM", sub: "Maruti Suzuki", role: "Records km from telematics and generates the monthly bill." },
 ];
 
 const SCRIPT = [
-  "Customer app: pick EV Battery (BaaS), then Demo Finance, then enter the vehicle number and linked mobile.",
+  "Customer app: pick EV Battery (BaaS), then Bajaj Finance, then enter the vehicle number and linked mobile.",
   "See one of three results: bill due, bill not generated, or already paid.",
   "Pay through mock UPI and get a receipt with a Bharat Connect reference (BC...).",
   "Fetch again: it now shows Already paid.",

@@ -6,7 +6,7 @@
 
 -- gen_random_uuid() is built in on PostgreSQL 13+.
 
--- ─── OEM (Sample Motors, telematics) ────────────────────────────────────────
+-- ─── OEM (Maruti Suzuki, telematics) ────────────────────────────────────────
 create table if not exists oem_plans (
   id                 text primary key,
   name               text not null,

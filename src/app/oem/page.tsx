@@ -142,7 +142,7 @@ export default function OemPage() {
 
   return (
     <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
-      <PageHeader title="OEM console" subtitle="Sample Motors: telematics, plans and monthly bill generation." />
+      <PageHeader title="OEM console" subtitle="Maruti Suzuki: telematics, plans and monthly bill generation." />
       {msg ? <Notice tone={msg.tone}>{msg.text}</Notice> : null}
 
       <Card

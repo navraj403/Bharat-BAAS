@@ -1,5 +1,5 @@
 /**
- * OEM (Sample Motors, telematics): PUBLIC API. Owner: agent A.
+ * OEM (Maruti Suzuki, telematics): PUBLIC API. Owner: agent A.
  * Signatures are FINAL (P0). Implement the bodies; do not change the signatures.
  * Other parties (the biller) may import ONLY this file from `parties/oem`.
  *

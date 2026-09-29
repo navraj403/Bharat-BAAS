@@ -7,10 +7,10 @@
  * NBBL txns/events and biller payments update. `fixtureReset()` restores the seed.
  *
  * Try in the COU (billerId / vehicle / mobile):
- *   demo-finance MH01AB1001 9800000001 → BILL_DUE ₹6,726.00
- *   demo-finance MH01AB1002 9800000002 → BILL_DUE ₹11,889.62 (arrears + late fee, overdue)
+ *   bajaj-finance MH01AB1001 9800000001 → BILL_DUE ₹6,726.00
+ *   bajaj-finance MH01AB1002 9800000002 → BILL_DUE ₹11,889.62 (arrears + late fee, overdue)
  *   volt-leasing MH01AB1003 9800000003 → ALREADY_PAID ₹12,183.50 (BCSEEDPAID01)
- *   demo-finance MH01AB1004 9800000004 → NOT_GENERATED
+ *   bajaj-finance MH01AB1004 9800000004 → NOT_GENERATED
  *   any wrong mobile / unknown vehicle   → NOT_FOUND
  *   any biller   MH01AB9999 (any mobile) → BILLER_UNAVAILABLE (SYS500)   [fixture-only trigger]
  *
@@ -242,10 +242,10 @@ function seedStore(): Store {
   const ago = (ms: number) => new Date(now - ms).toISOString();
 
   const vehicles: FxVehicle[] = [
-    { id: "11111111-0000-4000-8000-000000000001", regNo: "MH01AB1001", vin: "SMEVDEMO000001001", model: "Sample Motors Aura EV (sedan)", planId: "STD", odometerKm: 9380, activatedOn: isoDate(monthStart(-8)) },
-    { id: "11111111-0000-4000-8000-000000000002", regNo: "MH01AB1002", vin: "SMEVDEMO000001002", model: "Sample Motors Nova EV (hatch)", planId: "FLEX", odometerKm: 8150, activatedOn: isoDate(monthStart(-6)) },
-    { id: "11111111-0000-4000-8000-000000000003", regNo: "MH01AB1003", vin: "SMEVDEMO000001003", model: "Sample Motors Terra EV (SUV)", planId: "PRO", odometerKm: 14170, activatedOn: isoDate(monthStart(-10)) },
-    { id: "11111111-0000-4000-8000-000000000004", regNo: "MH01AB1004", vin: "SMEVDEMO000001004", model: "Sample Motors Aura EV (sedan)", planId: "STD", odometerKm: 12, activatedOn: isoDate(cur) },
+    { id: "11111111-0000-4000-8000-000000000001", regNo: "MH01AB1001", vin: "SMEVDEMO000001001", model: "Maruti Suzuki e Vitara (Delta)", planId: "STD", odometerKm: 9380, activatedOn: isoDate(monthStart(-8)) },
+    { id: "11111111-0000-4000-8000-000000000002", regNo: "MH01AB1002", vin: "SMEVDEMO000001002", model: "Maruti Suzuki e Vitara (Zeta)", planId: "FLEX", odometerKm: 8150, activatedOn: isoDate(monthStart(-6)) },
+    { id: "11111111-0000-4000-8000-000000000003", regNo: "MH01AB1003", vin: "SMEVDEMO000001003", model: "Maruti Suzuki e Vitara (Alpha)", planId: "PRO", odometerKm: 14170, activatedOn: isoDate(monthStart(-10)) },
+    { id: "11111111-0000-4000-8000-000000000004", regNo: "MH01AB1004", vin: "SMEVDEMO000001004", model: "Maruti Suzuki e Vitara (Delta)", planId: "STD", odometerKm: 12, activatedOn: isoDate(cur) },
   ];
   const [riya, arjun, meera] = vehicles;
   const trips: FxTrip[] = [
@@ -271,13 +271,13 @@ function seedStore(): Store {
     makeBill(meera, cycleOf(prev), 1850, addDays(t, -5), { ref: "BCSEEDPAID01", at: meeraPaidAt }),
   ];
   const customers: FxCustomer[] = [
-    { id: "33333333-0000-4000-8000-000000000001", billerId: "demo-finance", name: "Riya Sharma", mobile: "9800000001", vehicleRegNo: "MH01AB1001", contractId: "DF-BAAS-0001" },
-    { id: "33333333-0000-4000-8000-000000000002", billerId: "demo-finance", name: "Arjun Mehta", mobile: "9800000002", vehicleRegNo: "MH01AB1002", contractId: "DF-BAAS-0002" },
+    { id: "33333333-0000-4000-8000-000000000001", billerId: "bajaj-finance", name: "Riya Sharma", mobile: "9800000001", vehicleRegNo: "MH01AB1001", contractId: "BF-BAAS-0001" },
+    { id: "33333333-0000-4000-8000-000000000002", billerId: "bajaj-finance", name: "Arjun Mehta", mobile: "9800000002", vehicleRegNo: "MH01AB1002", contractId: "BF-BAAS-0002" },
     { id: "33333333-0000-4000-8000-000000000003", billerId: "volt-leasing", name: "Meera Iyer", mobile: "9800000003", vehicleRegNo: "MH01AB1003", contractId: "VL-BAAS-0001" },
-    { id: "33333333-0000-4000-8000-000000000004", billerId: "demo-finance", name: "Kabir Khan", mobile: "9800000004", vehicleRegNo: "MH01AB1004", contractId: "DF-BAAS-0003" },
+    { id: "33333333-0000-4000-8000-000000000004", billerId: "bajaj-finance", name: "Kabir Khan", mobile: "9800000004", vehicleRegNo: "MH01AB1004", contractId: "BF-BAAS-0003" },
   ];
   const billers: BillerSummary[] = [
-    { id: "demo-finance", name: "Demo Finance", category: "EV_BAAS", status: "ACTIVE" },
+    { id: "bajaj-finance", name: "Bajaj Finance", category: "EV_BAAS", status: "ACTIVE" },
     { id: "volt-leasing", name: "Volt Leasing", category: "EV_BAAS", status: "ACTIVE" },
   ];
 
@@ -328,10 +328,10 @@ function seedStore(): Store {
   }> = [
     { ref: "F-SEED000001", type: "FETCH", billerId: "volt-leasing", reg: "MH01AB1003", mobile: "9800000003", amount: 1218350, status: "SUCCESS", code: "000", fetchRef: null, billerRef: meeraBill.presentmentId, atMs: 3 * DAY_MS + 120_000, latency: 142, result: "BILL_DUE", autopay: true },
     { ref: "BCSEEDPAID01", type: "PAY", billerId: "volt-leasing", reg: "MH01AB1003", mobile: "9800000003", amount: 1218350, status: "SUCCESS", code: "000", fetchRef: "F-SEED000001", billerRef: meeraBill.presentmentId, atMs: 3 * DAY_MS, latency: 188, autopay: true },
-    { ref: "F-K7Q2M9XP4A", type: "FETCH", billerId: "demo-finance", reg: "MH01AB1001", mobile: "9800000001", amount: 672600, status: "SUCCESS", code: "000", fetchRef: null, billerRef: uuid(), atMs: 2 * DAY_MS, latency: 131, result: "BILL_DUE" },
-    { ref: "F-R3T8W2NB6C", type: "FETCH", billerId: "demo-finance", reg: "MH01AB1002", mobile: "9800000002", amount: 1188962, status: "SUCCESS", code: "000", fetchRef: null, billerRef: uuid(), atMs: DAY_MS + 3_600_000, latency: 164, result: "BILL_DUE" },
-    { ref: "F-H5J9D3LV2E", type: "FETCH", billerId: "demo-finance", reg: "MH01AB1004", mobile: "9800000004", amount: null, status: "SUCCESS", code: "BFR001", fetchRef: null, billerRef: null, atMs: DAY_MS, latency: 97, result: "NOT_GENERATED" },
-    { ref: "F-P2X6C8QZ5M", type: "FETCH", billerId: "demo-finance", reg: "MH01AB1001", mobile: "9800000009", amount: null, status: "SUCCESS", code: "BFR002", fetchRef: null, billerRef: null, atMs: 6 * 3_600_000, latency: 88, result: "NOT_FOUND" },
+    { ref: "F-K7Q2M9XP4A", type: "FETCH", billerId: "bajaj-finance", reg: "MH01AB1001", mobile: "9800000001", amount: 672600, status: "SUCCESS", code: "000", fetchRef: null, billerRef: uuid(), atMs: 2 * DAY_MS, latency: 131, result: "BILL_DUE" },
+    { ref: "F-R3T8W2NB6C", type: "FETCH", billerId: "bajaj-finance", reg: "MH01AB1002", mobile: "9800000002", amount: 1188962, status: "SUCCESS", code: "000", fetchRef: null, billerRef: uuid(), atMs: DAY_MS + 3_600_000, latency: 164, result: "BILL_DUE" },
+    { ref: "F-H5J9D3LV2E", type: "FETCH", billerId: "bajaj-finance", reg: "MH01AB1004", mobile: "9800000004", amount: null, status: "SUCCESS", code: "BFR001", fetchRef: null, billerRef: null, atMs: DAY_MS, latency: 97, result: "NOT_GENERATED" },
+    { ref: "F-P2X6C8QZ5M", type: "FETCH", billerId: "bajaj-finance", reg: "MH01AB1001", mobile: "9800000009", amount: null, status: "SUCCESS", code: "BFR002", fetchRef: null, billerRef: null, atMs: 6 * 3_600_000, latency: 88, result: "NOT_FOUND" },
     { ref: "F-Z9B4N7GS3T", type: "FETCH", billerId: "volt-leasing", reg: "MH01AB1003", mobile: "9800000003", amount: null, status: "FAILED", code: "SYS500", fetchRef: null, billerRef: null, atMs: 2 * 3_600_000, latency: 3004, result: "BILLER_UNAVAILABLE" },
   ];
   for (const h of hist) {

@@ -10,7 +10,7 @@ This is the one document every build agent works from. The PM hands each agent *
 A working, deployed prototype of **four parties** exchanging a usage-based EV battery bill over a mock Bharat Connect rail. It runs on **Next.js 16 + Supabase Postgres** and is deployed on **Vercel**.
 
 The demo, about 3 minutes, happens in the customer app (COU):
-1. The customer picks **EV Battery (BaaS)**, then the financier **Demo Finance**, then enters the vehicle number and linked mobile.
+1. The customer picks **EV Battery (BaaS)**, then the financier **Bajaj Finance**, then enters the vehicle number and linked mobile.
 2. The customer sees **one of three results**: bill due, bill not generated, or already paid.
 3. They pay through mock UPI and get a receipt with a Bharat Connect reference (`BC…`).
 4. **Fetch again** now shows *Already paid*.
@@ -23,8 +23,8 @@ The demo, about 3 minutes, happens in the customer app (COU):
 
 | Party | Real-world role | Responsibilities in the MVP | Owns the tables | Does NOT |
 |---|---|---|---|---|
-| **OEM** (`Sample Motors`) | Car maker plus telematics | Tracks odometer and trips per vehicle, holds the battery plan (**fixed monthly fee + rate per km**), **generates the monthly bill** (fixed + km × rate + GST) | `oem_*` | Know about customers' mobiles or payments beyond a paid flag |
-| **Biller** (`Demo Finance`, `Volt Leasing`) | BaaS financier, the biller on BBPS (BOU folded in) | Holds customer KYC (name, **linked mobile**, vehicle, contract). **Pulls bills from the OEM** and turns them into receivables. Adds **arrears and late fee** and presents one payable amount to NBBL. Accepts the **payment advice** and marks bills paid | `biller_*` | Talk to COUs directly |
+| **OEM** (`Maruti Suzuki`) | Car maker plus telematics | Tracks odometer and trips per vehicle, holds the battery plan (**fixed monthly fee + rate per km**), **generates the monthly bill** (fixed + km × rate + GST) | `oem_*` | Know about customers' mobiles or payments beyond a paid flag |
+| **Biller** (`Bajaj Finance`, `Volt Leasing`) | BaaS financier, the biller on BBPS (BOU folded in) | Holds customer KYC (name, **linked mobile**, vehicle, contract). **Pulls bills from the OEM** and turns them into receivables. Adds **arrears and late fee** and presents one payable amount to NBBL. Accepts the **payment advice** and marks bills paid | `biller_*` | Talk to COUs directly |
 | **NBBL** (Bharat Connect switch) | BBPCU | Keeps the **biller registry**. Routes bill-fetch and bill-pay between COU and biller. Issues **BBPS transaction refs**. **Captures transaction data only** (txn and event log, never bills). Disputes come in Phase 2 | `nbbl_*` | Store or compute bills |
 | **COU** (customer app, `DemoPay`) | Customer Operating Unit, a payment app | Customer UI: category → biller → vehicle no + mobile → result → pay (mock UPI) → receipt. Records its own payment orders | `cou_*` | Talk to the biller or OEM directly |
 
@@ -92,10 +92,10 @@ Plans (in seed data): **STD** Standard: ₹1,500 fixed + ₹3.50/km · **PRO** P
 
 | Customer | Plan | Scenario | Expected result |
 |---|---|---|---|
-| Riya, `MH01AB1001`, mobile `9800000001`, Demo Finance | STD | Aug: 1,200 km, due in future | **BILL_DUE ₹6,726.00** = fixed ₹1,500 + variable ₹4,200 (1,200 × ₹3.50) = ₹5,700 + GST ₹1,026 |
-| Arjun, `MH01AB1002`, `9800000002`, Demo Finance | FLEX | Jul 900 km **overdue**, Aug 1,100 km due | **BILL_DUE ₹11,889.62** = Aug ₹6,370.82 (₹999 + ₹4,400 = ₹5,399 + GST ₹971.82) + arrears Jul ₹5,426.82 (₹999 + ₹3,600 = ₹4,599 + GST ₹827.82) + late fee ₹91.98 (2% × ₹4,599) |
+| Riya, `MH01AB1001`, mobile `9800000001`, Bajaj Finance | STD | Aug: 1,200 km, due in future | **BILL_DUE ₹6,726.00** = fixed ₹1,500 + variable ₹4,200 (1,200 × ₹3.50) = ₹5,700 + GST ₹1,026 |
+| Arjun, `MH01AB1002`, `9800000002`, Bajaj Finance | FLEX | Jul 900 km **overdue**, Aug 1,100 km due | **BILL_DUE ₹11,889.62** = Aug ₹6,370.82 (₹999 + ₹4,400 = ₹5,399 + GST ₹971.82) + arrears Jul ₹5,426.82 (₹999 + ₹3,600 = ₹4,599 + GST ₹827.82) + late fee ₹91.98 (2% × ₹4,599) |
 | Meera, `MH01AB1003`, `9800000003`, **Volt Leasing** | PRO | Aug 1,850 km, **paid** (ref `BCSEEDPAID01`) | **ALREADY_PAID ₹12,183.50** = ₹2,000 + ₹8,325 = ₹10,325 + GST ₹1,858.50 |
-| Kabir, `MH01AB1004`, `9800000004`, Demo Finance | STD | Activated this month, no bill yet | **NOT_GENERATED**. After the OEM adds 1,600 km and generates: **BILL_DUE ₹8,378.00** = ₹1,500 + ₹5,600 = ₹7,100 + GST ₹1,278 |
+| Kabir, `MH01AB1004`, `9800000004`, Bajaj Finance | STD | Activated this month, no bill yet | **NOT_GENERATED**. After the OEM adds 1,600 km and generates: **BILL_DUE ₹8,378.00** = ₹1,500 + ₹5,600 = ₹7,100 + GST ₹1,278 |
 | Wrong mobile for Riya | – | – | **NOT_FOUND** (a generic message that doesn't reveal which field was wrong) |
 
 Seed dates are **relative to `now()`**, so the statuses hold whenever the seed runs: Aug bill_date = now − 5 days, Jul bill_date = now − 35 days.
@@ -106,12 +106,12 @@ Vehicle numbers are **normalised** to uppercase with spaces and dashes removed (
 | # | Screen | Content | Notes |
 |---|---|---|---|
 | 1 | **Home** | DemoPay header, category grid (Electricity, Mobile, FASTag… disabled, with **EV Battery (BaaS)** highlighted as "New") | Only EV Battery works |
-| 2 | **Choose biller** | List from NBBL registry for category `EV_BAAS`: Demo Finance, Volt Leasing | Bharat Connect logo-mark placeholder (generic "B" mark, no real logo) |
+| 2 | **Choose biller** | List from NBBL registry for category `EV_BAAS`: Bajaj Finance, Volt Leasing | Bharat Connect logo-mark placeholder (generic "B" mark, no real logo) |
 | 3 | **Enter details** | **Vehicle registration no** (placeholder `MH 01 AB 1001`, uppercase as typed) and **Linked mobile no** (10 digits, `+91` prefix). "Fetch bill" button | Inline validation. Button disabled until valid. A "Demo numbers" helper chip fills the seed values |
 | 4a | **Bill due** | Customer name (masked: `Riya S****`), vehicle, bill period, **Fixed battery fee · Pay-per-use (km driven × rate/km) · arrears · late fee · GST · total**, due date (red "Overdue" pill if applicable), "Pay ₹6,726.00" | The breakdown is the hero: this is what makes the category legible |
 | 4b | **Not generated** | "No bill generated yet for this vehicle. Bills are generated on the 1st of each month." + "Check again" | Neutral state, not an error |
 | 4c | **Already paid** | "Paid ₹12,183.50 on 24 Sep 2026", BBPS ref, mode. "View receipt" | Green state |
-| 4d | **Not found / biller unavailable** | "We couldn't find an account for this vehicle and mobile number with Demo Finance." / "Biller is not responding, try again" | Error states with retry |
+| 4d | **Not found / biller unavailable** | "We couldn't find an account for this vehicle and mobile number with Bajaj Finance." / "Biller is not responding, try again" | Error states with retry |
 | 5 | **Pay** | Bottom sheet: UPI (default), Net banking, Debit card. Mock UPI PIN pad (any 4–6 digits). "Simulate failure" toggle, visible in demo mode | No real payment |
 | 6 | **Processing → Receipt** | Spinner (≈800 ms), then a receipt: ✓ Paid, amount, biller, vehicle, **Bharat Connect ref BC…**, COU order id, time. "Done" returns to screen 3 with values kept | "Fetch again" demo shows 4c |
 
@@ -122,7 +122,7 @@ Vehicle numbers are **normalised** to uppercase with spaces and dashes removed (
 | `/` | Landing: a 4-party diagram with one link per party plus the demo script. **Reset demo data** button |
 | `/cou` | The customer app above, in the phone frame |
 | `/oem` | Vehicles table (reg no, model, plan, odometer, **km this cycle**, last bill status). "+100 km" / "+500 km" / custom km per row, plus a per-row **Generate bill** button (calls generate with `[vehicleId]`; **this is the button used in the demo**). A bulk **Generate bills for {cycle}** (cycle picker, defaults to the current month) sits behind a confirm, because it also bills Riya, Arjun and Meera for the current month. Bills table |
-| `/biller` | Biller switcher (Demo Finance / Volt Leasing). KPI tiles (receivables due, collected, overdue count). Customers table. Receivables table (status pills UNPAID / OVERDUE / PAID). Payments table with BBPS ref. **Sync from OEM** |
+| `/biller` | Biller switcher (Bajaj Finance / Volt Leasing). KPI tiles (receivables due, collected, overdue count). Customers table. Receivables table (status pills UNPAID / OVERDUE / PAID). Payments table with BBPS ref. **Sync from OEM** |
 | `/nbbl` | KPI tiles (fetches, payments, success rate, value processed). Transactions table (ref, type, biller, COU, masked customer ref, amount, response code, latency). Click a row to see the **hop timeline** (COU_REQ → BILLER_REQ → BILLER_RESP → COU_RESP with JSON payloads). Auto-refresh every 3 s. "Disputes: Phase 2" tab (disabled) |
 | `/admin/db` | Table list grouped by party with row counts. Click a table to see its rows (read-only, newest first, 100 max). Link to the Supabase Table Editor |
 
@@ -245,7 +245,7 @@ RLS stays **off**. The app connects server-side only, with no anon access. Befor
 - **D and E** build entirely on `src/lib/client/api.ts` with `NEXT_PUBLIC_USE_FIXTURES=1`, and never touch the DB.
 - **Critical path:** P0 → B → P2. If B slips, the PM moves the late-fee and arrears line items to P2 and B ships the single-bill presentment first.
 
-**Fallbacks if time runs short (cut in this order):** OEM custom-km input (keep ±100/500 buttons) → biller switcher (Demo Finance only) → NBBL auto-refresh (manual refresh button) → DB explorer rows view (keep counts plus a Supabase link). **Never cut:** the COU fetch/pay flow, the three result states, the NBBL txn log, or reset.
+**Fallbacks if time runs short (cut in this order):** OEM custom-km input (keep ±100/500 buttons) → biller switcher (Bajaj Finance only) → NBBL auto-refresh (manual refresh button) → DB explorer rows view (keep counts plus a Supabase link). **Never cut:** the COU fetch/pay flow, the three result states, the NBBL txn log, or reset.
 
 ---
 

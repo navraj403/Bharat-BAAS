@@ -52,10 +52,10 @@ async function call(method, path, body, { allowError = false } = {}) {
 const get = (p) => call("GET", p).then((r) => r.data);
 const post = (p, b) => call("POST", p, b).then((r) => r.data);
 
-const RIYA = { billerId: "demo-finance", vehicleNo: "MH01AB1001", mobile: "9800000001" };
-const ARJUN = { billerId: "demo-finance", vehicleNo: "MH01AB1002", mobile: "9800000002" };
+const RIYA = { billerId: "bajaj-finance", vehicleNo: "MH01AB1001", mobile: "9800000001" };
+const ARJUN = { billerId: "bajaj-finance", vehicleNo: "MH01AB1002", mobile: "9800000002" };
 const MEERA = { billerId: "volt-leasing", vehicleNo: "MH01AB1003", mobile: "9800000003" };
-const KABIR = { billerId: "demo-finance", vehicleNo: "MH01AB1004", mobile: "9800000004" };
+const KABIR = { billerId: "bajaj-finance", vehicleNo: "MH01AB1004", mobile: "9800000004" };
 const BC_REF = /^BC[A-Z0-9]{10}$/;
 
 const fetchBill = (req) => post("/api/cou/fetch", req);
@@ -81,11 +81,11 @@ async function main() {
   });
 
   // b
-  await step("b. COU billers for EV_BAAS include demo-finance + volt-leasing", async () => {
+  await step("b. COU billers for EV_BAAS include bajaj-finance + volt-leasing", async () => {
     const r = await get("/api/cou/billers?category=EV_BAAS");
     assert(Array.isArray(r), "not an array");
     const ids = r.map((b) => b.id);
-    assert(ids.includes("demo-finance") && ids.includes("volt-leasing"), `ids=${ids.join(",")}`);
+    assert(ids.includes("bajaj-finance") && ids.includes("volt-leasing"), `ids=${ids.join(",")}`);
     return ids.join(", ");
   });
 
@@ -154,8 +154,8 @@ async function main() {
 
   // Baseline payment count before paying.
   let paymentsBefore = 0;
-  await step("h. biller overview baseline (demo-finance)", async () => {
-    const o = await get("/api/biller/overview?billerId=demo-finance");
+  await step("h. biller overview baseline (bajaj-finance)", async () => {
+    const o = await get("/api/biller/overview?billerId=bajaj-finance");
     paymentsBefore = o.payments.length;
     s.collectedBefore = o.kpis.collectedPaise;
     return `payments=${paymentsBefore}, collected=${o.kpis.collectedPaise}`;
@@ -204,8 +204,8 @@ async function main() {
     assert(!raw.includes("9800000001"), "raw mobile found in NBBL events");
     return `${fSteps} | ${pSteps}`;
   });
-  await step("h. biller overview (demo-finance) shows the payment collected", async () => {
-    const o = await get("/api/biller/overview?billerId=demo-finance");
+  await step("h. biller overview (bajaj-finance) shows the payment collected", async () => {
+    const o = await get("/api/biller/overview?billerId=bajaj-finance");
     const p = o.payments.find((x) => x.bbpsTxnRef === s.riyaRef);
     assert(p, "payment row missing");
     eq(p.amountPaise, 672600, "payment amount");
@@ -226,7 +226,7 @@ async function main() {
     const r = await pay({ fetchRef: s.riyaFetchRef, amountPaise: 672600, mode: "UPI" });
     eq(r.status, "SUCCESS", "status");
     eq(r.receipt.bbpsTxnRef, s.riyaRef, "same bbpsTxnRef");
-    const o = await get("/api/biller/overview?billerId=demo-finance");
+    const o = await get("/api/biller/overview?billerId=bajaj-finance");
     eq(o.payments.length, s.paymentsAfterRiya, "payments count unchanged");
     const list = await get("/api/nbbl/transactions?type=PAY&limit=200");
     eq(list.filter((t) => t.fetchRef === s.riyaFetchRef).length, 1, "one PAY txn for the fetchRef");

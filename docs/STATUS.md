@@ -51,3 +51,5 @@ All 5 were fixed by agent I (`777e468`, `1f05029`).
 - Project `navraj7/bharat-baas`, production https://bharat-baas.vercel.app, region hnd1 (`vercel.json`).
 - Env (production): DATABASE_URL (sensitive), NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, NEXT_PUBLIC_USE_FIXTURES=0, NEXT_PUBLIC_DEMO_MODE=1.
 - Redeploy: `npx vercel deploy --prod`. GitHub auto-deploy is not connected (Vercel's GitHub app lacks repo access); connect it in Vercel → Project → Git if wanted.
+
+- post-G4 · User decision: OEM shown as Maruti Suzuki (e Vitara trims), biller demo-finance renamed to bajaj-finance / Bajaj Finance (contracts BF-BAAS-*); Volt Leasing and DemoPay stay generic. A disclaimer footer (prototype, not affiliated, no real payments) is in the root layout, and the AGENTS.md brand rule is updated. DB reseeded; check 29/29, smoke 23/23 local.

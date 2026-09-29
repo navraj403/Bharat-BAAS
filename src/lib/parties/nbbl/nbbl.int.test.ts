@@ -18,13 +18,13 @@ const dueResp = {
   result: "BILL_DUE",
   responseCode: "000",
   message: "Success",
-  bill: { presentmentId: PRESENTMENT, amountPaise: 50000, billerId: "demo-finance" },
+  bill: { presentmentId: PRESENTMENT, amountPaise: 50000, billerId: "bajaj-finance" },
 } as unknown as BillerFetchResponse;
 
 const receipt = {
   bbpsTxnRef: "x",
-  billerId: "demo-finance",
-  billerName: "Demo Finance",
+  billerId: "bajaj-finance",
+  billerName: "Bajaj Finance",
   vehicleRegNo: "TEST1",
   customerName: "T****",
   amountPaise: 50000,
@@ -33,7 +33,7 @@ const receipt = {
   cycles: ["2026-08"],
 };
 
-const fetchReq = (billerId = "demo-finance") => ({
+const fetchReq = (billerId = "bajaj-finance") => ({
   couId: COU,
   billerId,
   category: "EV_BAAS" as const,
@@ -57,7 +57,7 @@ afterAll(async () => {
 describe("nbbl", () => {
   it("lists active billers", async () => {
     const b = await listBillers("EV_BAAS");
-    expect(b.map((x) => x.id)).toEqual(expect.arrayContaining(["demo-finance", "volt-leasing"]));
+    expect(b.map((x) => x.id)).toEqual(expect.arrayContaining(["bajaj-finance", "volt-leasing"]));
   });
 
   it("fetch -> pay happy path with masked events", async () => {
@@ -66,7 +66,7 @@ describe("nbbl", () => {
     expect(f.responseCode).toBe("000");
     expect(f.fetchRef).toMatch(/^F-[A-Z0-9]{10}$/);
     expect(fetchBillMock.mock.calls[0][0]).toMatchObject({
-      billerId: "demo-finance",
+      billerId: "bajaj-finance",
       vehicleNo: "MH01AB1001",
       mobile: "9800000001",
     });
@@ -103,7 +103,7 @@ describe("nbbl", () => {
     expect(p.status).toBe("SUCCESS");
     expect(p.bbpsTxnRef).toMatch(/^BC[A-Z0-9]{10}$/);
     expect(paymentAdviceMock.mock.calls[0][0]).toMatchObject({
-      billerId: "demo-finance",
+      billerId: "bajaj-finance",
       presentmentId: PRESENTMENT,
       amountPaise: 50000,
     });
@@ -177,8 +177,8 @@ describe("nbbl", () => {
       result: "NOT_FOUND",
       responseCode: "BFR002",
       message: "x",
-      billerId: "demo-finance",
-      billerName: "Demo Finance",
+      billerId: "bajaj-finance",
+      billerName: "Bajaj Finance",
     });
     const f = await billFetch(fetchReq());
     const p = await billPay({

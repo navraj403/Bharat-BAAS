@@ -11,10 +11,10 @@ import {
   fixtureVehicles,
 } from "./fixtures";
 
-const RIYA = { billerId: "demo-finance", vehicleNo: "mh-01 ab 1001", mobile: "9800000001" };
-const ARJUN = { billerId: "demo-finance", vehicleNo: "MH01AB1002", mobile: "9800000002" };
+const RIYA = { billerId: "bajaj-finance", vehicleNo: "mh-01 ab 1001", mobile: "9800000001" };
+const ARJUN = { billerId: "bajaj-finance", vehicleNo: "MH01AB1002", mobile: "9800000002" };
 const MEERA = { billerId: "volt-leasing", vehicleNo: "MH01AB1003", mobile: "9800000003" };
-const KABIR = { billerId: "demo-finance", vehicleNo: "MH01AB1004", mobile: "9800000004" };
+const KABIR = { billerId: "bajaj-finance", vehicleNo: "MH01AB1004", mobile: "9800000004" };
 
 describe("fixtures reproduce BUILD_PLAN §4", () => {
   beforeEach(() => fixtureReset());
@@ -84,12 +84,12 @@ describe("fixtures reproduce BUILD_PLAN §4", () => {
     expect(retry.status === "SUCCESS" && retry.receipt.bbpsTxnRef).toBe(p.receipt.bbpsTxnRef);
     expect(fixturePay({ fetchRef: paid.fetchRef, amountPaise: 672600, mode: "UPI" })).toMatchObject({ status: "FAILED", responseCode: "BPR002" });
     expect(fixtureTransaction(p.receipt.bbpsTxnRef)?.events.map((e) => e.step)).toEqual(["COU_REQ", "PAY_REQ", "ADVICE_ACK", "COU_RESP"]);
-    expect(fixtureBillerOverview("demo-finance").kpis.collectedPaise).toBe(672600);
+    expect(fixtureBillerOverview("bajaj-finance").kpis.collectedPaise).toBe(672600);
   });
 
   it("seeds NBBL history and biller KPIs", () => {
     expect(fixtureStats().fetches).toBeGreaterThanOrEqual(6);
-    const df = fixtureBillerOverview("demo-finance");
+    const df = fixtureBillerOverview("bajaj-finance");
     expect(df.kpis.receivablesDuePaise).toBe(672600 + 1188962);
     expect(df.kpis.overdueCount).toBe(1);
     expect(fixtureBillerOverview("volt-leasing").kpis.collectedPaise).toBe(1218350);

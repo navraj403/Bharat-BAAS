@@ -101,7 +101,7 @@ Two agents may work at the same time. To avoid merge conflicts:
 
 - **Everything is mock.** No real payment gateways, UPI intents, NPCI/BBPS endpoints or bank APIs. No network calls to third parties at all.
 - **No real personal data.** Use obviously fake names, `MH-01-XX-0000`-style dummy registrations and dummy mobile numbers (`98XXXXXX01`). Don't store or log anything resembling real Aadhaar, PAN or card numbers.
-- **Don't impersonate brands.** Use generic names ("Sample Motors", "Demo Finance"). The research names real OEMs and financiers only as context.
+- **Brand names only as illustration.** The user chose to show real names for the OEM (Maruti Suzuki) and one biller (Bajaj Finance). Keep the "prototype, not affiliated, no real payments" disclaimer visible on every page (root layout). Don't use their logos, colours or real product data. Every other party name stays generic (Volt Leasing, DemoPay).
 - Mark every assumed number in the code with a `// ASSUMPTION:` comment (for example the GST rate or the late-fee rule), so the demo can say what is real and what is illustrative.
 
 ## Definition of done (for the 2-hour build)

@@ -42,7 +42,7 @@ vi.mock("@/lib/parties/oem/api", async () => {
 import { fetchBill, overview, paymentAdvice, sync } from "./api";
 import { UnknownBillerError } from "./errors";
 
-const BILLER = "demo-finance";
+const BILLER = "bajaj-finance";
 const RUN = Date.now().toString(36).toUpperCase().slice(-5);
 const V = { due: `TEST${RUN}A`, arrears: `TEST${RUN}B`, none: `TEST${RUN}C` };
 const MOBILE = { due: "9911100001", arrears: "9911100002", none: "9911100003" };
@@ -170,7 +170,7 @@ describe("biller fetch", () => {
 
   it("NOT_FOUND on wrong mobile (generic), and on malformed mobile", async () => {
     const r = await fetchFor(V.due, "9911199999");
-    expect(r).toMatchObject({ result: "NOT_FOUND", responseCode: "BFR002", billerId: BILLER, billerName: "Demo Finance" });
+    expect(r).toMatchObject({ result: "NOT_FOUND", responseCode: "BFR002", billerId: BILLER, billerName: "Bajaj Finance" });
     expect(r.message).not.toMatch(/mobile is|wrong mobile|vehicle is/i);
     expect((await fetchFor(V.due, "12")).result).toBe("NOT_FOUND");
     // A valid customer of ANOTHER biller is not found here either.
@@ -247,7 +247,7 @@ describe("biller payment advice", () => {
 describe("biller overview + sync", () => {
   it("overview includes TEST rows and KPIs; unknown biller throws", async () => {
     const o = await overview(BILLER);
-    expect(o.biller.name).toBe("Demo Finance");
+    expect(o.biller.name).toBe("Bajaj Finance");
     const c = o.customers.find((x) => x.vehicleRegNo === V.due);
     expect(c?.outstandingPaise).toBe(672600);
     expect(c?.mobileMasked).toBe("99XXXXXX01");
@@ -268,10 +268,10 @@ describe("biller overview + sync", () => {
 describe("seeded acceptance (read-only amounts)", () => {
   it("Riya 672600, Arjun 1188962, Meera ALREADY_PAID, Kabir NOT_GENERATED; amounts unchanged", async () => {
     const before = await sql`select id, status, total_paise, late_fee_paise from biller_receivables where oem_bill_id::text like '22222222-%' order by id`;
-    const riya = await fetchBill({ nbblRef: "F-T", billerId: "demo-finance", vehicleNo: "MH 01 AB 1001", mobile: "9800000001" });
-    const arjun = await fetchBill({ nbblRef: "F-T", billerId: "demo-finance", vehicleNo: "MH01AB1002", mobile: "9800000002" });
+    const riya = await fetchBill({ nbblRef: "F-T", billerId: "bajaj-finance", vehicleNo: "MH 01 AB 1001", mobile: "9800000001" });
+    const arjun = await fetchBill({ nbblRef: "F-T", billerId: "bajaj-finance", vehicleNo: "MH01AB1002", mobile: "9800000002" });
     const meera = await fetchBill({ nbblRef: "F-T", billerId: "volt-leasing", vehicleNo: "MH01AB1003", mobile: "9800000003" });
-    const kabir = await fetchBill({ nbblRef: "F-T", billerId: "demo-finance", vehicleNo: "MH01AB1004", mobile: "9800000004" });
+    const kabir = await fetchBill({ nbblRef: "F-T", billerId: "bajaj-finance", vehicleNo: "MH01AB1004", mobile: "9800000004" });
 
     // If the PM/integrator already paid or generated in this DB, skip the strict amount checks.
     if (riya.result === "BILL_DUE") expect(riya.bill.amountPaise).toBe(672600);
