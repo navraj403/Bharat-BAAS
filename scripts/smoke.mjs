@@ -283,6 +283,114 @@ async function main() {
     eq(r.receipt.bbpsTxnRef, "BCSEEDPAID01", "ref");
   });
 
+  // k1–k9: complaints (docs/COMPLAINTS_PLAN.md). Seed rows are untouched by a–k.
+  const CC_ID = /^CC[A-Z0-9]{10}$/;
+  const act = (id, body, opts) => call("POST", `/api/nbbl/complaints/${encodeURIComponent(id)}/actions`, body, opts);
+  const expectErr = (r, status, code, what) => {
+    eq(r.status, status, `${what} HTTP status`);
+    if (code) eq(r.data?.error?.code, code, `${what} error.code`);
+  };
+
+  await step("k1. COU orders include seeded FAILED DP-SEED000002 (no ref) and DP-SEED000001", async () => {
+    const orders = await get("/api/cou/orders");
+    assert(Array.isArray(orders), "not an array");
+    const failed = orders.find((o) => o.orderId === "DP-SEED000002");
+    assert(failed, "DP-SEED000002 missing");
+    eq(failed.status, "FAILED", "DP-SEED000002 status");
+    eq(failed.bbpsTxnRef, null, "DP-SEED000002 bbpsTxnRef");
+    assert(orders.some((o) => o.orderId === "DP-SEED000001"), "DP-SEED000001 missing");
+    return `${orders.length} orders`;
+  });
+
+  await step("k2. NBBL complaints list seeded CCSEED000001 OPEN/BILLER/overdue; stats counts", async () => {
+    const list = await get("/api/nbbl/complaints");
+    assert(Array.isArray(list), "not an array");
+    const c = list.find((x) => x.complaintId === "CCSEED000001");
+    assert(c, "CCSEED000001 missing");
+    eq(c.status, "OPEN", "status");
+    eq(c.pendingWith, "BILLER", "pendingWith");
+    eq(c.overdue, true, "overdue");
+    const st = await get("/api/nbbl/complaints/stats");
+    assert(st.open >= 1, `open=${st.open}`);
+    assert(st.overdue >= 1, `overdue=${st.overdue}`);
+    assert(st.byParty.BILLER >= 1, `byParty.BILLER=${st.byParty.BILLER}`);
+    return `open=${st.open} overdue=${st.overdue} biller=${st.byParty.BILLER}`;
+  });
+
+  const raiseBody = { orderId: "DP-SEED000002", reason: "DEBITED_TXN_FAILED", description: "smoke" };
+  await step("k3. COU raise on DP-SEED000002 -> DPT ticket, CC id, OPEN, pending COU, due ≈ +5d", async () => {
+    const t0 = Date.now();
+    const c = await post("/api/cou/complaints", raiseBody);
+    assert(/^DPT-/.test(c.ticketNo), `ticketNo ${c.ticketNo}`);
+    assert(CC_ID.test(c.complaintId), `complaintId ${c.complaintId}`);
+    eq(c.status, "OPEN", "status");
+    eq(c.pendingWith, "COU", "pendingWith");
+    eq(c.overdue, false, "overdue");
+    const due = Date.parse(c.dueAt);
+    assert(Math.abs(due - (t0 + 5 * 86400000)) < 10 * 60000, `dueAt ${c.dueAt} not ≈ now+5d`);
+    s.cc = c;
+    return `${c.ticketNo} / ${c.complaintId}`;
+  });
+
+  await step("k4. re-raise the same (order, reason) -> same ticket (idempotent)", async () => {
+    const c = await post("/api/cou/complaints", raiseBody);
+    eq(c.complaintId, s.cc.complaintId, "complaintId");
+    eq(c.ticketNo, s.cc.ticketNo, "ticketNo");
+  });
+
+  await step("k5. NBBL ASSIGN -> BILLER (event COU→BILLER); ASSIGN BILLER again -> 409", async () => {
+    const id = s.cc.complaintId;
+    const r = await act(id, { action: "ASSIGN", assignTo: "BILLER" });
+    eq(r.data.pendingWith, "BILLER", "pendingWith");
+    const d = await get(`/api/nbbl/complaints/${id}`);
+    assert(
+      d.events.some((e) => e.action === "ASSIGNED" && e.fromParty === "COU" && e.toParty === "BILLER"),
+      `events: ${d.events.map((e) => `${e.action}:${e.fromParty}->${e.toParty}`).join(", ")}`,
+    );
+    expectErr(await act(id, { action: "ASSIGN", assignTo: "BILLER" }, { allowError: true }), 409, "INVALID_TRANSITION", "re-ASSIGN");
+  });
+
+  await step("k6. NOTE, CLOSE REFUNDED, CLOSE again 409, REOPEN -> NBBL, CLOSE REFUNDED", async () => {
+    const id = s.cc.complaintId;
+    const before = (await get(`/api/nbbl/complaints/${id}`)).events.length;
+    await act(id, { action: "NOTE", note: "smoke note" });
+    const afterNote = await get(`/api/nbbl/complaints/${id}`);
+    eq(afterNote.events.length, before + 1, "events after NOTE");
+    eq(afterNote.events.at(-1).action, "NOTE", "last event");
+    const closed = (await act(id, { action: "CLOSE", resolution: "REFUNDED" })).data;
+    eq(closed.status, "CLOSED", "status after CLOSE");
+    eq(closed.resolution, "REFUNDED", "resolution");
+    assert(closed.closedAt, "closedAt not set");
+    expectErr(await act(id, { action: "CLOSE", resolution: "REFUNDED" }, { allowError: true }), 409, "INVALID_TRANSITION", "re-CLOSE");
+    const reopened = (await act(id, { action: "REOPEN" })).data;
+    eq(reopened.status, "OPEN", "status after REOPEN");
+    eq(reopened.pendingWith, "NBBL", "pendingWith after REOPEN");
+    eq(reopened.closedAt, null, "closedAt after REOPEN");
+    const again = (await act(id, { action: "CLOSE", resolution: "REFUNDED" })).data;
+    eq(again.status, "CLOSED", "status after 2nd CLOSE");
+  });
+
+  await step("k7. COU My tickets shows the ticket CLOSED / REFUNDED", async () => {
+    const list = await get("/api/cou/complaints");
+    const t = list.find((x) => x.ticketNo === s.cc.ticketNo);
+    assert(t, "ticket missing");
+    eq(t.status, "CLOSED", "status");
+    eq(t.resolution, "REFUNDED", "resolution");
+  });
+
+  await step("k8. errors: unknown order 404, junk reason 400, unknown complaint 404, junk status 400", async () => {
+    const opt = { allowError: true };
+    expectErr(await call("POST", "/api/cou/complaints", { orderId: "DP-NOPE000000", reason: "OTHER" }, opt), 404, null, "unknown order");
+    expectErr(await call("POST", "/api/cou/complaints", { orderId: "DP-SEED000002", reason: "JUNK" }, opt), 400, null, "junk reason");
+    expectErr(await call("GET", "/api/nbbl/complaints/CCNOPE000000", undefined, opt), 404, null, "unknown complaint");
+    expectErr(await call("GET", "/api/nbbl/complaints?status=JUNK", undefined, opt), 400, null, "junk status");
+  });
+
+  await step("k9. admin tables list the complaint tables", async () => {
+    const tables = (await get("/api/admin/tables")).map((t) => t.table);
+    for (const n of ["nbbl_complaints", "nbbl_complaint_events", "cou_complaints"]) assert(tables.includes(n), `${n} missing`);
+  });
+
   // l
   await step("l. reset demo data (leave clean)", async () => {
     const r = await post("/api/admin/reset");

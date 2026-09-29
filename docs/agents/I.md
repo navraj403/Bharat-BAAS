@@ -1,5 +1,12 @@
 # Agent I: Integrator
 
+## Phase C: Complaints
+**State:** DONE
+- **Done:** `scripts/smoke.mjs` gained 9 complaint steps (k1–k9) before the final reset: seeded orders (FAILED `DP-SEED000002`, no ref), seeded `CCSEED000001` OPEN/BILLER/overdue + stats, raise on `DP-SEED000002` (DPT/CC formats, pending COU, due ≈ +5 d), idempotent re-raise, ASSIGN→BILLER + 409 on repeat, NOTE/CLOSE REFUNDED/409 re-close/REOPEN→NBBL/CLOSE, COU My tickets CLOSED/REFUNDED, error codes (404/400/404/400), admin tables list the 3 new tables. `npm run smoke`: 32 passed, 0 failed.
+- **Cross-lane fixes:** none needed; all complaint routes behaved per contract.
+- **Pending:** none.
+- **Files touched:** `scripts/smoke.mjs`, `docs/agents/I.md`.
+
 **Model:** Opus · **Phase:** P2 · **State:** DONE
 **Last update:** 16:40 (end of P2)
 

@@ -1,3 +1,27 @@
+## Phase C: Complaints review
+
+Scope: `git diff 72b8688..7027b6a` (F, C, D, E). Read-only review by code reading; typecheck/lint could not be run (shell tool unavailable for those commands in this session). No blocker or high finding.
+
+Checked and clean: COU imports only `parties/nbbl/api` and its own tables (`cou_payments`, `cou_complaints`); NBBL reads only `nbbl_*` via `repo`/`complaints-repo` plus `biller` nothing; NBBL stores `customer_ref_masked` (PAY txn's masked value or vehicle reg no) only; `applyAction`/`canTransition` are correct for ASSIGN/NOTE/CLOSE/REOPEN (CLOSE requires a valid resolution, REOPEN clears resolution and closedAt, ASSIGN to same party is a 409); `applyLocked` does `select ... for update`, update and event insert in one tx and `decide` throwing rolls back; server and fixtures both use the shared `dueAt` (UTC ms) and `isOverdue`; Next 16 `ctx.params` is awaited; `ComplaintError` mapped in `_http.handle`; migration 0002 is idempotent (`if not exists`); seed truncate lists all three new tables; SLA/triage numbers carry `// ASSUMPTION:`; UI radios/select/textareas have labels, money uses `formatINR`/`Money`, null `billerName`/`txnRef` handled.
+
+1. **MEDIUM** `src/lib/parties/nbbl/api.ts:358-384` + `supabase/migrations/0002_complaints.sql:199-203` (no unique constraint on open (cou_id, order_id, reason)). Idempotent raise is check-then-insert with no lock or unique index. Two near-simultaneous submits (double tap on a slow network, two tabs) both pass `findOpenByOrder`, so two NBBL complaints and two `cou_complaints` rows are created for one order and reason, and `cou_complaints.complaint_id` has no unique constraint either. The UI `submitting` guard only blocks the same component instance. Fix: add `create unique index if not exists nbbl_complaints_open_uq on nbbl_complaints (cou_id, order_id, reason) where status = 'OPEN'` and a unique index on `cou_complaints(complaint_id)`; in `insertComplaint` catch unique_violation (23505) and return `findOpenByOrder`. Alternatively take `pg_advisory_xact_lock(hashtext(couId||orderId||reason))` inside the insert tx and re-check there.
+
+2. **LOW** `src/lib/parties/nbbl/api.ts:383` vs `supabase/seed.sql:231`. Live auto-triage event note is just "Auto-triage" while the seed writes an explanatory note ("Auto-triage: paid bill not posted, pending with the biller."). The NBBL timeline for real tickets therefore says nothing about why it is pending with that party. Fix: build the note from `reason` and `pay?.status` (a small `triageNote()` in `domain/complaints.ts`, also used by fixtures at `fixtures.ts:978`).
+
+3. **LOW** `src/lib/domain/complaints.ts:136-140,294-298`. REOPEN keeps the original `dueAt` (documented ASSUMPTION), so a ticket reopened after its SLA is overdue immediately and stays overdue with no way to reset it. Not a crash, just a demo wart. Fix: on REOPEN recompute `dueAt = dueAt(now, reason)` (needs `dueAt` in `ComplaintState` and the UPDATE at `complaints-repo.ts:164`), or keep and mention it in the demo script.
+
+4. **LOW** `src/lib/parties/nbbl/api.ts:349-357`, `src/lib/parties/cou/api.ts:202-208`. No check that the reason fits the order: `DEBITED_TXN_FAILED` on a SUCCESS order, or `DUPLICATE_PAYMENT` on a FAILED order with no txn, is accepted and auto-triaged (a FAILED order plus DUPLICATE_PAYMENT lands "pending with biller" with no txn linked). Fix: optional, reject or route to NBBL when `pay` is null for BILLER-bound reasons; low priority for a demo.
+
+5. **LOW** `src/lib/parties/nbbl/complaints-repo.ts:91-99`, `nbbl/api.ts:350`. The customer's free-text description is stored unmasked in `nbbl_complaints.description` and the RAISED event note, so a customer who types a full mobile number puts it in NBBL tables (which are meant to hold masked refs only). Fix: apply the existing `maskMobile`-style regex to any 10-digit run in the description before `raiseComplaint` stores it (NBBL side), or add a UI hint "don't enter your mobile number".
+
+6. **LOW** `src/app/api/nbbl/complaints/[id]/actions/route.ts:13`, `domain/complaints.ts:259`. `actor` is taken from the request body (`req.actor`) and written to the event log, so any caller can attribute a note or close to "DEMOPAY" or "SYSTEM". Acceptable for a mock, but the timeline is presented as an audit trail. Fix: drop `req.actor` in the route (always `NBBL_OPS`), or restrict to a whitelist.
+
+7. **LOW** `src/app/nbbl/ComplaintsView.tsx:162-163`. When the operator clicks another row, `useAsync` keeps the previous complaint's `data` until the new id loads (depends on `useAsync` keying); the header and action bar can briefly show the old complaint, and the `ActionBar` (keyed by complaintId) would act on the id in `c`, which is correct, so no wrong-target write, only a flash of stale data. Fix: render loading when `c?.complaintId !== id`.
+
+Counts: BLOCKER 0, HIGH 0, MEDIUM 1, LOW 6.
+
+---
+
 # Agent R: Phase P3 review (read-only)
 
 Scope: `git diff 9a4eba8..HEAD -- src scripts supabase`. Every finding below was verified by reading the code. Line numbers are approximate to the cited construct.
