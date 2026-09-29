@@ -20,10 +20,11 @@ import type {
   OemPlan,
   OemVehicleRow,
 } from "@/lib/domain/types";
+import * as svc from "./service";
 
 /** All plans (STD, PRO, FLEX), ordered by id. */
 export async function listPlans(): Promise<OemPlan[]> {
-  throw new Error("NotImplemented");
+  return svc.listPlans();
 }
 
 /**
@@ -32,7 +33,7 @@ export async function listPlans(): Promise<OemPlan[]> {
  * the current calendar month, 0 if none) and `lastBill` (latest cycle) or null.
  */
 export async function listVehicles(): Promise<OemVehicleRow[]> {
-  throw new Error("NotImplemented");
+  return svc.listVehicles();
 }
 
 /**
@@ -42,9 +43,7 @@ export async function listVehicles(): Promise<OemVehicleRow[]> {
  * Returns the refreshed row.
  */
 export async function addTrip(vehicleId: string, km: Km): Promise<OemVehicleRow> {
-  void vehicleId;
-  void km;
-  throw new Error("NotImplemented");
+  return svc.addTrip(vehicleId, km);
 }
 
 /**
@@ -64,14 +63,12 @@ export async function generateBills(
   cycle: Cycle,
   vehicleIds?: string[],
 ): Promise<GenerateBillsResponse> {
-  void cycle;
-  void vehicleIds;
-  throw new Error("NotImplemented");
+  return svc.generateBills(cycle, vehicleIds);
 }
 
 /** `GET /api/oem/bills` (console, no regNo). All bills, newest cycle first, then regNo. */
 export async function listBills(): Promise<OemBill[]> {
-  throw new Error("NotImplemented");
+  return svc.listBills();
 }
 
 /**
@@ -80,8 +77,7 @@ export async function listBills(): Promise<OemBill[]> {
  * dashes removed) before lookup. Unknown vehicle → [].
  */
 export async function getBillsByRegNo(regNo: string): Promise<OemBill[]> {
-  void regNo;
-  throw new Error("NotImplemented");
+  return svc.getBillsByRegNo(regNo);
 }
 
 /**
@@ -94,8 +90,5 @@ export async function markPaid(
   bbpsTxnRef: string,
   paidAt: IsoDateTime,
 ): Promise<MarkPaidResponse> {
-  void billIds;
-  void bbpsTxnRef;
-  void paidAt;
-  throw new Error("NotImplemented");
+  return svc.markPaid(billIds, bbpsTxnRef, paidAt);
 }
