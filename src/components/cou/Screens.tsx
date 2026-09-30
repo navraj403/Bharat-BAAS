@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { BillerSummary, FetchResult, Receipt } from "@/lib/domain/types";
 import { formatINR } from "@/lib/domain/money";
 import { formatCycle } from "@/lib/domain/cycle";
-import { BharatConnect, Button, Card, FOCUS, Initials, Screen, Spinner } from "./ui";
+import { BharatConnect, Button, Card, FOCUS, Initials, Screen, Skeleton, Spinner } from "./ui";
 import { Icon, type IconName } from "./icons";
 import { MODE_LABEL, displayVehicle, formatDate, isValidMobile, isValidVehicle, nextBillDate } from "./format";
 
@@ -87,7 +87,7 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
                   }`}
                 >
                   {c.enabled && (
-                    <span className="absolute -top-1.5 right-0 rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
+                    <span className="absolute -top-1.5 right-0 rounded-full bg-brand px-1.5 text-[10px] font-bold text-ink">
                       New
                     </span>
                   )}
@@ -259,12 +259,14 @@ export function BillersScreen({
 // ─── Details + inline fetch result (Paytm-style) ─────────────────────────────
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+// Each chip belongs to the biller that holds that seeded customer (supabase/seed.sql), so it
+// only shows on that biller's form.
 const DEMO_CHIPS = [
-  { label: "Riya · Bill due", v: "MH01AB1001", m: "9800000001" },
-  { label: "Arjun · Overdue", v: "MH01AB1002", m: "9800000002" },
-  { label: "Meera · Paid", v: "MH01AB1003", m: "9800000003" },
-  { label: "Kabir · No bill", v: "MH01AB1004", m: "9800000004" },
-  { label: "Wrong mobile", v: "MH01AB1001", m: "9111111111" },
+  { label: "Riya · Bill due", billerId: "bajaj-finance", v: "MH01AB1001", m: "9800000001" },
+  { label: "Arjun · Overdue", billerId: "bajaj-finance", v: "MH01AB1002", m: "9800000002" },
+  { label: "Meera · Paid", billerId: "volt-leasing", v: "MH01AB1003", m: "9800000003" },
+  { label: "Kabir · No bill", billerId: "bajaj-finance", v: "MH01AB1004", m: "9800000004" },
+  { label: "Wrong mobile", billerId: "bajaj-finance", v: "MH01AB1001", m: "9111111111" },
 ];
 
 /** A fetch result that stays on the details form (everything except BILL_DUE). */
@@ -273,7 +275,7 @@ export type InlineResult = Exclude<FetchResult, { result: "BILL_DUE" }>;
 function PaidCard({ receipt, onViewReceipt }: { receipt: Receipt; onViewReceipt: () => void }) {
   const period = receipt.cycles.length ? receipt.cycles.map(formatCycle).join(" + ") : "Your bill";
   return (
-    <div role="status" className="rounded-2xl border border-success/40 bg-success-soft p-3 text-sm text-success">
+    <div className="rounded-2xl border border-success/40 bg-success-soft p-3 text-sm text-success">
       <p className="flex items-center gap-1.5 text-base font-semibold">
         <Icon name="checkCircle" /> No bill due
       </p>
@@ -312,7 +314,7 @@ function InlineResultCard({
       );
     case "NOT_GENERATED":
       return (
-        <div role="status" className="rounded-2xl border border-warning/40 bg-warning-soft p-3 text-sm text-warning">
+        <div className="rounded-2xl border border-warning/40 bg-warning-soft p-3 text-sm text-warning">
           <p className="flex items-center gap-1.5 text-base font-semibold">
             <Icon name="clock" /> Bill not generated yet
           </p>
@@ -336,6 +338,24 @@ function InlineResultCard({
         </div>
       );
   }
+}
+
+/** Bill-card-shaped shimmer shown while NBBL fetches the bill. */
+function FetchSkeleton() {
+  return (
+    <div className="mt-3 animate-rise rounded-2xl border border-pay-line bg-surface p-3">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-10 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-1/3" />
+        </div>
+      </div>
+      <Skeleton className="mx-auto mt-4 h-7 w-1/2" />
+      <Skeleton className="mx-auto mt-2 h-4 w-1/4 rounded-full" />
+      <p className="mt-3 text-center text-xs text-ink-muted">Fetching your bill via Bharat Connect…</p>
+    </div>
+  );
 }
 
 export function DetailsScreen({
@@ -446,8 +466,10 @@ export function DetailsScreen({
         </form>
       </Card>
 
+      {fetching && <FetchSkeleton />}
+
       {inline && (
-        <div className="mt-3">
+        <div className="mt-3 animate-rise">
           <InlineResultCard result={inline} onViewReceipt={onViewReceipt} />
         </div>
       )}
@@ -458,11 +480,11 @@ export function DetailsScreen({
         </p>
       )}
 
-      {DEMO_MODE && (
+      {DEMO_MODE && DEMO_CHIPS.some((c) => c.billerId === biller.id) && (
         <div className="mt-4">
           <p className="mb-2 px-1 text-xs font-semibold text-ink-faint">Demo numbers</p>
           <div className="flex flex-wrap gap-2">
-            {DEMO_CHIPS.map((c) => (
+            {DEMO_CHIPS.filter((c) => c.billerId === biller.id).map((c) => (
               <button
                 key={c.label}
                 type="button"

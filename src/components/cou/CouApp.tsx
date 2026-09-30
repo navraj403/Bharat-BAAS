@@ -7,7 +7,8 @@ import { BillersScreen, DetailsScreen, HomeScreen, type BillersState, type Inlin
 import { BillScreen, ReceiptScreen, type ReceiptView } from "./ResultScreens";
 import { HelpScreen } from "./HelpScreens";
 import { PaySheet } from "./PaySheet";
-import { normaliseVehicle } from "./format";
+import { formatDate, normaliseVehicle } from "./format";
+import { formatINR } from "@/lib/domain/money";
 
 type Screen = "home" | "billers" | "details" | "bill" | "receipt" | "help";
 
@@ -51,6 +52,8 @@ export function CouApp() {
   const [payOpen, setPayOpen] = useState(false);
   const [paying, setPaying] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptView | null>(null);
+  // One persistent live region: screen readers miss role="status" nodes that mount already filled.
+  const [announce, setAnnounce] = useState("");
   const frameZoom = useFrameZoom();
 
   async function loadBillers() {
@@ -89,9 +92,21 @@ export function CouApp() {
     setFetching(true);
     setFetchError(null);
     setInline(null);
+    setAnnounce("Fetching your bill");
     try {
       const r = await couFetch({ billerId: biller.id, vehicleNo: normaliseVehicle(vehicle), mobile });
       if (r.result !== "NOT_FOUND") setRecent({ biller, vehicle, mobile });
+      setAnnounce(
+        r.result === "BILL_DUE"
+          ? `Bill found: ${formatINR(r.bill.amountPaise)} due ${formatDate(r.bill.dueDate)}`
+          : r.result === "ALREADY_PAID"
+            ? "No bill due. This bill is already paid."
+            : r.result === "NOT_GENERATED"
+              ? "Bill not generated yet."
+              : r.result === "NOT_FOUND"
+                ? "No account found for this vehicle and mobile."
+                : "The biller isn't responding. Try again in a moment.",
+      );
       if (r.result === "BILL_DUE") {
         setDue({ bill: r.bill, fetchRef: r.fetchRef });
         setScreen("bill");
@@ -99,6 +114,7 @@ export function CouApp() {
         setInline(r);
       }
     } catch {
+      setAnnounce("");
       setFetchError("Something went wrong while fetching your bill. Try again.");
     } finally {
       setFetching(false);
@@ -109,6 +125,7 @@ export function CouApp() {
     if (!due || paying) return;
     const amountPaise = due.bill.amountPaise;
     setPaying(true);
+    setAnnounce("Processing payment");
     try {
       const [res] = await Promise.all([couPay({ fetchRef: due.fetchRef, amountPaise, mode, simulateFailure }), sleep(800)]);
       setReceipt(
@@ -116,8 +133,10 @@ export function CouApp() {
           ? { kind: "success", receipt: res.receipt, couOrderId: res.couOrderId }
           : { kind: "failed", message: res.message, couOrderId: res.couOrderId, amountPaise },
       );
+      setAnnounce(res.status === "SUCCESS" ? `Payment successful. ${formatINR(amountPaise)} paid.` : "Payment failed.");
     } catch {
       setReceipt({ kind: "failed", message: "We couldn't complete the payment. Try again.", amountPaise });
+      setAnnounce("Payment failed.");
     } finally {
       setPaying(false);
       setPayOpen(false);
@@ -196,6 +215,9 @@ export function CouApp() {
       className="relative h-dvh w-full overflow-hidden bg-pay-canvas min-[480px]:h-[800px] min-[480px]:w-[390px] min-[480px]:rounded-[2.5rem] min-[480px]:border-[10px] min-[480px]:border-ink min-[480px]:shadow-card"
     >
       {content}
+      <p aria-live="polite" className="sr-only">
+        {announce}
+      </p>
       {payOpen && due && (
         <PaySheet
           amountPaise={due.bill.amountPaise}

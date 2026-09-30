@@ -30,12 +30,21 @@ const txnCols = (selected: string | null): Column<NbblTxn>[] => [
   { key: "time", header: "Time", render: (t) => <span className={t.ref === selected ? "font-semibold" : ""}>{formatDateTime(t.createdAt)}</span> },
 ];
 
-function EventItem({ ev }: { ev: NbblEvent }) {
+/**
+ * One hop. Hops mount once (stable keys), so the rise-in plays when a txn is opened (staggered)
+ * and for each new hop as it arrives on a poll; already-seen hops don't re-animate.
+ */
+function EventItem({ ev, index, latest }: { ev: NbblEvent; index: number; latest: boolean }) {
   const [open, setOpen] = useState(false);
+  const delay = { animationDelay: `${index * 90}ms` };
+  const dot = ev.step === "ERROR" ? "bg-danger" : "bg-accent";
   return (
-    <li className="relative pb-4 pl-6 last:pb-0">
-      <span aria-hidden className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-accent" />
-      <span aria-hidden className="absolute left-[4px] top-4 h-full w-px bg-line" />
+    <li className="relative animate-rise pb-4 pl-6 last:pb-0" style={delay}>
+      <span aria-hidden className={`absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full ${dot}`} />
+      {latest ? (
+        <span aria-hidden className={`absolute left-0 top-1.5 h-2.5 w-2.5 animate-ping-once rounded-full opacity-0 ${dot}`} style={delay} />
+      ) : null}
+      <span aria-hidden className="absolute left-[4px] top-4 h-full w-px origin-top animate-grow-y bg-line" style={delay} />
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs font-semibold text-ink">{ev.step}</span>
         <span className="text-sm text-ink-muted">{STEP_LABEL[ev.step] ?? ev.step}</span>
@@ -44,7 +53,7 @@ function EventItem({ ev }: { ev: NbblEvent }) {
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="rounded text-xs font-medium text-accent hover:underline"
+          className="rounded text-xs font-medium text-accent hover:underline focus-visible:underline"
         >
           {open ? "Hide payload" : "Show payload"}
         </button>
@@ -70,8 +79,8 @@ function Timeline({ txnRef, paused }: { txnRef: string; paused: boolean }) {
         <p className="p-4 text-sm text-ink-faint">No events logged.</p>
       ) : (
         <ol className="p-4">
-          {detail.data.events.map((ev) => (
-            <EventItem key={ev.id} ev={ev} />
+          {detail.data.events.map((ev, i, all) => (
+            <EventItem key={ev.id} ev={ev} index={i} latest={i === all.length - 1} />
           ))}
         </ol>
       )}
