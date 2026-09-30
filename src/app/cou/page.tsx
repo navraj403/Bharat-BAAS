@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CouApp } from "@/components/cou/CouApp";
 
-export const metadata: Metadata = { title: "DemoPay · Customer app" };
+export const metadata: Metadata = { title: "MeterPe · Customer app" };
 
 export default function CouPage() {
   return (

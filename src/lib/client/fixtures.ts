@@ -805,7 +805,7 @@ export function fixtureBills(regNo?: string): OemBill[] {
  *                                                  CCFX00000004 DUPLICATE_PAYMENT  BILLER CLOSED (REJECTED)
  *   DP-SEED000002 Riya  FAILED, no bbps ref (seed) CCFX00000003 OTHER              COU    OPEN (NBBL → COU)
  *   DP-FX00000003 Arjun FAILED, PAY BPR001         CCFX00000002 DEBITED_TXN_FAILED NBBL   OPEN
- * Raising DEBITED_TXN_FAILED on DP-SEED000002 → pending with COU (DemoPay).
+ * Raising DEBITED_TXN_FAILED on DP-SEED000002 → pending with COU (MeterPe).
  */
 function seedComplaints(s: Store, now: number): void {
   const ago = (ms: number) => new Date(now - ms).toISOString();
@@ -887,7 +887,7 @@ function seedComplaints(s: Store, now: number): void {
     [
       ["RAISED", null, null, "DEMOPAY", "The app showed an error while paying.", 20 * H],
       ["ASSIGNED", null, "NBBL", ACTOR_SYSTEM, triageNote("OTHER", null), 20 * H - 1000],
-      ["ASSIGNED", "NBBL", "COU", "NBBL_OPS", "No PAY reached the switch; DemoPay to check the UPI leg.", 18 * H],
+      ["ASSIGNED", "NBBL", "COU", "NBBL_OPS", "No PAY reached the switch; MeterPe to check the UPI leg.", 18 * H],
     ],
   );
   add(

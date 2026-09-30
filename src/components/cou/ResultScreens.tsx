@@ -4,9 +4,33 @@ import { useState, type CSSProperties } from "react";
 import type { BillPresentment, Receipt } from "@/lib/domain/types";
 import { formatINR } from "@/lib/domain/money";
 import { formatCycle } from "@/lib/domain/cycle";
-import { BharatConnect, Button, Card, FOCUS, Pill, Screen } from "./ui";
+import { BharatConnect, Button, Card, FOCUS, Pill, Screen, Tile } from "./ui";
 import { Icon } from "./icons";
 import { MODE_LABEL, displayVehicle, formatDate, formatDateTime } from "./format";
+
+/** Copies text to the clipboard; the label flips to "Copied" and is announced. */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked: the ref stays visible to copy by hand.
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={copied ? "Copied" : "Copy Bharat Connect ref"}
+      className={`rounded-md px-1.5 py-0.5 font-sans text-xs font-semibold text-pay hover:bg-pay-soft ${FOCUS}`}
+    >
+      <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+    </button>
+  );
+}
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -19,6 +43,18 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 
 // ─── Bill due → confirm ──────────────────────────────────────────────────────
 
+/** "Due in 4 days" / "Due today" / "Overdue", from the bill's due date and the viewer's today. */
+function dueChip(bill: BillPresentment): { text: string; tone: "danger" | "warning" | "success" } {
+  if (bill.overdue) return { text: bill.arrearsPaise > 0 ? "Includes overdue bill" : "Overdue", tone: "danger" };
+  const today = new Date();
+  const utcToday = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const [y, m, d] = bill.dueDate.split("-").map(Number);
+  const days = Math.round((Date.UTC(y, m - 1, d) - utcToday) / 86_400_000);
+  if (days < 0) return { text: "Overdue", tone: "danger" };
+  if (days === 0) return { text: "Due today", tone: "warning" };
+  return { text: `Due in ${days} day${days === 1 ? "" : "s"}`, tone: days <= 3 ? "warning" : "success" };
+}
+
 export function BillScreen({
   bill,
   onBack,
@@ -28,73 +64,64 @@ export function BillScreen({
   onBack: () => void;
   onPay: () => void;
 }) {
-  const [open, setOpen] = useState(true);
-  const hasArrears = bill.arrearsPaise > 0 || bill.lateFeePaise > 0;
+  const usage = bill.lines.find((l) => l.kind === "USAGE" && l.cycle === bill.cycle);
+  const due = dueChip(bill);
 
   return (
     <Screen
       title="Bill details"
       onBack={onBack}
-      footer={<Button onClick={onPay}>Pay {formatINR(bill.amountPaise)}</Button>}
+      footer={<Button onClick={onPay}>Pay via Bharat Connect</Button>}
     >
-      <Card className="animate-rise text-center">
-        <p className="text-xs text-ink-muted">
-          {bill.customerName} · {displayVehicle(bill.vehicleRegNo)}
-        </p>
-        <p className="my-1 text-3xl font-bold tabular-nums text-ink">{formatINR(bill.amountPaise)}</p>
-        {bill.overdue ? (
-          <Pill tone="danger">{hasArrears ? "Includes overdue bill" : "Overdue"}</Pill>
-        ) : (
-          <Pill tone="pay">Due {formatDate(bill.dueDate)}</Pill>
-        )}
-        <p className="mt-2 text-xs text-ink-muted">
-          {bill.billerName} · {bill.planName} plan · {formatDate(bill.billPeriod.from)} – {formatDate(bill.billPeriod.to)}
-        </p>
-      </Card>
+      <Card className="animate-rise p-4">
+        <div className="flex items-center gap-3">
+          <Tile icon="battery" tone="green" round />
+          <div className="min-w-0">
+            <p className="text-base font-bold text-ink">EV Battery · {formatCycle(bill.cycle)}</p>
+            <p className="text-xs text-ink-muted">
+              {displayVehicle(bill.vehicleRegNo)} · {bill.planName} plan
+            </p>
+          </div>
+        </div>
 
-      <Card className="mt-3 animate-rise p-0 [animation-delay:80ms]">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-controls="bill-breakdown"
-          className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-sm font-semibold text-ink ${FOCUS}`}
-        >
-          Bill breakdown
-          <Icon name={open ? "chevronUp" : "chevronDown"} className="size-4 text-ink-muted" />
-        </button>
-        {open && (
-          <table id="bill-breakdown" className="w-full text-sm">
-            <caption className="sr-only">Bill breakdown</caption>
-            <tbody className="divide-y divide-line border-t border-line">
-              {bill.lines.map((l, i) => (
-                <tr key={`${l.kind}-${l.cycle}-${i}`}>
-                  <th
-                    scope="row"
-                    className={`px-3 py-2 text-left font-normal ${
-                      l.kind === "LATE_FEE" || l.kind === "ARREARS" ? "text-danger" : "text-ink"
-                    }`}
-                  >
-                    {l.label}
-                  </th>
-                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-ink">
-                    {formatINR(l.amountPaise)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-line-strong">
-                <th scope="row" className="px-3 py-3 text-left font-bold text-ink">
-                  Total
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <Pill tone="success">{bill.kmDriven.toLocaleString("en-IN")} km</Pill>
+          {usage?.ratePaisePerKm !== undefined && <Pill tone="info">{formatINR(usage.ratePaisePerKm)}/km</Pill>}
+          <Pill tone={due.tone}>{due.text}</Pill>
+        </div>
+
+        <table className="mt-3 w-full text-sm">
+          <caption className="sr-only">Bill breakdown</caption>
+          <tbody>
+            {bill.lines.map((l, i) => (
+              <tr key={`${l.kind}-${l.cycle}-${i}`}>
+                <th
+                  scope="row"
+                  className={`py-2 pr-3 text-left font-normal ${
+                    l.kind === "LATE_FEE" || l.kind === "ARREARS" ? "text-danger" : "text-ink"
+                  }`}
+                >
+                  {l.label}
                 </th>
-                <td className="whitespace-nowrap px-3 py-3 text-right font-bold tabular-nums text-ink">
-                  {formatINR(bill.amountPaise)}
-                </td>
+                <td className="whitespace-nowrap py-2 text-right tabular-nums text-ink">{formatINR(l.amountPaise)}</td>
               </tr>
-            </tfoot>
-          </table>
-        )}
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-line">
+              <th scope="row" className="pt-3 text-left text-base font-bold text-ink">
+                Total due
+              </th>
+              <td className="whitespace-nowrap pt-3 text-right text-2xl font-extrabold tabular-nums text-pay-bar">
+                {formatINR(bill.amountPaise)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <p className="mt-3 text-xs text-ink-muted">
+          {bill.customerName} · {bill.billerName} · {formatDate(bill.billPeriod.from)} – {formatDate(bill.billPeriod.to)}
+        </p>
       </Card>
       <div className="mt-3">
         <BharatConnect label="Bill fetched via Bharat Connect" />
@@ -111,12 +138,12 @@ export type ReceiptView =
 
 function receiptText(r: Receipt, orderId?: string): string {
   return [
-    "DemoPay receipt (prototype, no real payment)",
+    "MeterPe receipt (prototype, no real payment)",
     `Paid ${formatINR(r.amountPaise)} to ${r.billerName}`,
     `Vehicle: ${displayVehicle(r.vehicleRegNo)}`,
     `Paid for: ${r.cycles.map(formatCycle).join(" + ")}`,
     `Bharat Connect ref: ${r.bbpsTxnRef}`,
-    orderId ? `DemoPay order: ${orderId}` : null,
+    orderId ? `MeterPe order: ${orderId}` : null,
     `Mode: ${MODE_LABEL[r.mode] ?? r.mode}`,
     `Time: ${formatDateTime(r.paidAt)}`,
   ]
@@ -223,7 +250,7 @@ export function ReceiptScreen({
             <p className="text-sm text-ink">{view.message}</p>
             {view.couOrderId && (
               <dl className="mt-2 border-t border-line">
-                <Row label="DemoPay order" value={view.couOrderId} mono />
+                <Row label="MeterPe order" value={view.couOrderId} mono />
               </dl>
             )}
           </Card>
@@ -251,13 +278,22 @@ export function ReceiptScreen({
       <div className="min-h-0 flex-1 animate-rise overflow-y-auto p-3 [animation-delay:500ms]">
         <Card>
           <dl className="divide-y divide-line">
-            <Row label="Bharat Connect ref" value={r.bbpsTxnRef} mono />
+            <div className="flex items-center justify-between gap-3 py-2 text-sm">
+              <dt className="text-ink-muted">Bharat Connect ref</dt>
+              <dd className="flex items-center gap-1 font-mono font-medium text-ink">
+                {r.bbpsTxnRef}
+                <CopyButton text={r.bbpsTxnRef} />
+              </dd>
+            </div>
             <Row label="Vehicle" value={displayVehicle(r.vehicleRegNo)} />
             {r.cycles.length > 0 && <Row label="Paid for" value={r.cycles.map(formatCycle).join(" + ")} />}
             <Row label="Mode" value={MODE_LABEL[r.mode] ?? r.mode} />
-            {orderId && <Row label="DemoPay order" value={orderId} mono />}
+            {orderId && <Row label="MeterPe order" value={orderId} mono />}
           </dl>
         </Card>
+        <p className="mt-2 flex items-center gap-1.5 rounded-xl bg-pay-soft px-3 py-2 text-xs text-pay-deep">
+          <Icon name="checkCircle" className="size-4 shrink-0" /> Bharat Connect assured · verify this payment with your ref
+        </p>
         <ReceiptActions receipt={r} orderId={orderId} />
         <div className="mt-3">
           <BharatConnect label="Paid via Bharat Connect" />

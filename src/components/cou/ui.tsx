@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Icon } from "./icons";
+import { Icon, type IconName } from "./icons";
 
 export const FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pay";
@@ -17,6 +17,55 @@ export function Spinner({ className = "", decorative = false }: { className?: st
 /** Shimmering placeholder bar; size it with className (h-4 w-24 …). */
 export function Skeleton({ className = "" }: { className?: string }) {
   return <span aria-hidden="true" className={`skeleton ${className}`} />;
+}
+
+/** MeterPe app mark (logo A, "gauge"): a speedometer arc filling green with a yellow needle. */
+export function MeterPeMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 72 72" aria-hidden="true" className="shrink-0">
+      <rect width="72" height="72" rx="18" fill="var(--color-pay)" />
+      <path d="M16 46a20 20 0 0 1 40 0" fill="none" stroke="white" strokeOpacity={0.35} strokeWidth={7} strokeLinecap="round" />
+      <path d="M16 46a20 20 0 0 1 30-17.3" fill="none" stroke="white" strokeWidth={7} strokeLinecap="round" />
+      <path d="M36 46 47 30" stroke="var(--color-pay-accent)" strokeWidth={5} strokeLinecap="round" />
+      <circle cx="36" cy="46" r="5" fill="white" />
+    </svg>
+  );
+}
+
+export type TileTone = "green" | "amber" | "blue" | "violet" | "red" | "cyan" | "pink" | "slate";
+
+const TILE_BG: Record<TileTone, string> = {
+  green: "bg-tile-green",
+  amber: "bg-tile-amber",
+  blue: "bg-tile-blue",
+  violet: "bg-tile-violet",
+  red: "bg-tile-red",
+  cyan: "bg-tile-cyan",
+  pink: "bg-tile-pink",
+  slate: "bg-tile-slate",
+};
+
+/** Bright rounded-square icon tile (categories, pay methods, bill header). */
+export function Tile({
+  icon,
+  tone,
+  size = "md",
+  round = false,
+}: {
+  icon: IconName;
+  tone: TileTone;
+  size?: "sm" | "md";
+  round?: boolean;
+}) {
+  const box = size === "sm" ? "size-9" : "size-11";
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex shrink-0 items-center justify-center text-white ${box} ${round ? "rounded-full" : "rounded-xl"} ${TILE_BG[tone]}`}
+    >
+      <Icon name={icon} className={size === "sm" ? "size-[18px]" : "size-6"} />
+    </span>
+  );
 }
 
 /** Generic Bharat Connect style mark (placeholder, not the real logo). */
@@ -67,7 +116,7 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ variant = "primary", loading, children, className = "", disabled, ...rest }: BtnProps) {
   const styles = {
-    primary: "bg-pay text-white hover:bg-pay-deep",
+    primary: "bg-pay text-white hover:bg-pay-hover",
     success: "bg-success text-white hover:opacity-90",
     secondary: "border border-pay-line bg-surface text-pay hover:bg-pay-soft",
   }[variant];
@@ -101,7 +150,7 @@ export function Screen({
 }) {
   return (
     <div className="flex h-full flex-col bg-pay-canvas">
-      <header className="shrink-0 bg-pay-deep px-3 pb-3 pt-3 text-white">
+      <header className="shrink-0 bg-pay-bar px-3 pb-3 pt-3 text-white">
         <div className="flex items-center gap-1">
           {onBack && (
             <button

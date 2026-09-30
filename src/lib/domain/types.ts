@@ -689,7 +689,7 @@ export const COMPLAINT_PARTIES: readonly ComplaintParty[] = ["COU", "NBBL", "BIL
  * and fall back to this label only when `billerName` is null.
  */
 export const COMPLAINT_PARTY_LABELS: Record<ComplaintParty, string> = {
-  COU: "DemoPay",
+  COU: "MeterPe",
   NBBL: "Bharat Connect",
   BILLER: "Biller",
 };

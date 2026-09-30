@@ -8,7 +8,7 @@ import { ConfirmBar } from "@/components/consoles/ConfirmBar";
 import { Notice, errMsg } from "@/components/consoles/PageShell";
 
 const PARTIES = [
-  { href: "/cou", name: "COU", sub: "DemoPay", role: "Customer app: pick biller, fetch the bill, pay via mock UPI." },
+  { href: "/cou", name: "COU", sub: "MeterPe", role: "Customer app: pick biller, fetch the bill, pay via mock UPI." },
   { href: "/nbbl", name: "NBBL", sub: "Bharat Connect switch", role: "Routes fetch and pay, issues BBPS refs, logs every hop." },
   { href: "/biller", name: "Biller", sub: "Bajaj Finance / Volt Leasing", role: "Pulls bills from the OEM, adds arrears and late fee, takes payment." },
   { href: "/oem", name: "OEM", sub: "Maruti Suzuki", role: "Records km from telematics and generates the monthly bill." },

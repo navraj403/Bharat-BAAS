@@ -185,7 +185,7 @@ export function initialAssignee(reason: ComplaintReason, payTxnStatus: NbblTxnSt
 export function triageNote(reason: ComplaintReason, payTxnStatus: NbblTxnStatus | null): string {
   switch (reason) {
     case "DEBITED_TXN_FAILED":
-      if (payTxnStatus === null) return "Auto-triage: no payment reached Bharat Connect, pending with DemoPay.";
+      if (payTxnStatus === null) return "Auto-triage: no payment reached Bharat Connect, pending with MeterPe.";
       if (payTxnStatus === "SUCCESS") return "Auto-triage: Bharat Connect shows the payment successful, pending with the biller.";
       if (payTxnStatus === "PENDING") return "Auto-triage: the PAY is stuck at the switch, pending with Bharat Connect.";
       return "Auto-triage: the PAY failed at the switch, pending with Bharat Connect.";

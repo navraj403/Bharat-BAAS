@@ -2,17 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PaymentMode } from "@/lib/domain/types";
-import { Button, FOCUS, Pill, Spinner } from "./ui";
+import { Button, FOCUS, Spinner, Tile, type TileTone } from "./ui";
 import { Icon, type IconName } from "./icons";
 import { formatINR } from "@/lib/domain/money";
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
-const METHODS: { mode: PaymentMode; label: string; hint: string; icon: IconName; tag?: string }[] = [
-  { mode: "UPI", label: "UPI", hint: "demo@okbank", icon: "upi", tag: "Fastest" },
-  { mode: "UPI_AUTOPAY", label: "UPI AutoPay", hint: "Pay monthly bills on their own", icon: "repeat" },
-  { mode: "NETBANKING", label: "Net banking", hint: "Mock bank login", icon: "bank" },
-  { mode: "DEBIT_CARD", label: "Debit card", hint: "Mock card payment", icon: "card" },
+const METHODS: { mode: PaymentMode; label: string; hint: string; icon: IconName; tone: TileTone; tag?: string }[] = [
+  { mode: "UPI", label: "UPI", hint: "demo@okbank", icon: "upi", tone: "green", tag: "Fastest" },
+  { mode: "UPI_AUTOPAY", label: "UPI AutoPay", hint: "Pay monthly bills on their own", icon: "repeat", tone: "violet" },
+  { mode: "NETBANKING", label: "Net banking", hint: "Mock bank login", icon: "bank", tone: "blue" },
+  { mode: "DEBIT_CARD", label: "Debit card", hint: "Mock card payment", icon: "card", tone: "amber" },
 ];
 
 const PIN_MODES: PaymentMode[] = ["UPI", "UPI_AUTOPAY"];
@@ -133,18 +133,14 @@ export function PaySheet({
                           onChange={() => setMode(m.mode)}
                           className="sr-only"
                         />
-                        <span
-                          className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                            on ? "bg-pay text-white" : "bg-surface-2 text-ink-muted"
-                          }`}
-                        >
-                          <Icon name={m.icon} className="size-4" />
-                        </span>
+                        <Tile icon={m.icon} tone={m.tone} size="sm" />
                         <span className="min-w-0 flex-1">
                           <span className="block font-semibold text-ink">{m.label}</span>
                           <span className="block text-xs text-ink-muted">{m.hint}</span>
                         </span>
-                        {m.tag && <Pill tone="pay">{m.tag}</Pill>}
+                        {m.tag && (
+                          <span className="rounded-full bg-pay-accent px-2 py-0.5 text-xs font-semibold text-pay-accent-ink">{m.tag}</span>
+                        )}
                         <span
                           aria-hidden="true"
                           className={`size-4 shrink-0 rounded-full border-2 ${on ? "border-pay bg-pay shadow-[inset_0_0_0_2px_white]" : "border-line-strong"}`}

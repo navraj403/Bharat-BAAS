@@ -67,7 +67,7 @@ describe("initialAssignee", () => {
     expect(pendingWithLabel("BILLER", "Bajaj Finance")).toBe("Bajaj Finance");
     expect(pendingWithLabel("BILLER", null)).toBe("Biller");
     expect(pendingWithLabel("NBBL")).toBe("Bharat Connect");
-    expect(pendingWithLabel("COU")).toBe("DemoPay");
+    expect(pendingWithLabel("COU")).toBe("MeterPe");
   });
 });
 
@@ -173,7 +173,7 @@ describe("ref generators", () => {
 
 describe("triageNote", () => {
   it("explains the initial assignee", () => {
-    expect(triageNote("DEBITED_TXN_FAILED", null)).toBe("Auto-triage: no payment reached Bharat Connect, pending with DemoPay.");
+    expect(triageNote("DEBITED_TXN_FAILED", null)).toBe("Auto-triage: no payment reached Bharat Connect, pending with MeterPe.");
     expect(triageNote("DEBITED_TXN_FAILED", "FAILED")).toContain("pending with Bharat Connect");
     expect(triageNote("DEBITED_TXN_FAILED", "PENDING")).toContain("pending with Bharat Connect");
     expect(triageNote("DEBITED_TXN_FAILED", "SUCCESS")).toContain("pending with the biller");
