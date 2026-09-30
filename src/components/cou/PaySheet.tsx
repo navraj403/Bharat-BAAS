@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PaymentMode } from "@/lib/domain/types";
 import { Button, FOCUS, Pill, Spinner } from "./ui";
 import { Icon, type IconName } from "./icons";
@@ -36,6 +36,29 @@ export function PaySheet({
   const [step, setStep] = useState<"method" | "pin">("method");
   const [pin, setPin] = useState("");
   const [fail, setFail] = useState(false);
+  // Exit animation: slide down and fade, then unmount.
+  const [closing, setClosing] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  function close() {
+    if (paying || closing) return;
+    setClosing(true);
+    setTimeout(onClose, 220);
+  }
+
+  // Focus the sheet on open (so Escape and Tab start inside it); Escape closes it.
+  useEffect(() => {
+    sheetRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+      else if (step === "pin" && !paying && /^[0-9]$/.test(e.key)) press(e.key);
+      else if (step === "pin" && !paying && e.key === "Backspace") press("⌫");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   function next() {
     if (PIN_MODES.includes(mode)) setStep("pin");
@@ -48,16 +71,25 @@ export function PaySheet({
   }
 
   return (
-    <div className="absolute inset-0 z-10 flex items-end bg-black/45">
+    <div
+      onClick={(e) => e.target === e.currentTarget && close()}
+      className={`absolute inset-0 z-10 flex items-end bg-black/45 transition-opacity duration-200 starting:opacity-0 ${
+        closing ? "opacity-0" : "opacity-100"
+      }`}
+    >
       <div
+        ref={sheetRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label="Pay bill"
-        className="max-h-full w-full rounded-t-3xl bg-surface px-4 pb-4 pt-2 shadow-card"
+        className={`max-h-full w-full rounded-t-3xl bg-surface px-4 pb-4 pt-2 shadow-card outline-none transition-transform duration-300 ease-out-soft starting:translate-y-full ${
+          closing ? "translate-y-full" : "translate-y-0"
+        }`}
       >
         <span aria-hidden="true" className="mx-auto mb-3 block h-1 w-10 rounded-full bg-line-strong" />
         {paying ? (
-          <div className="flex h-80 flex-col items-center justify-center gap-3 text-ink">
+          <div className="flex h-80 animate-rise flex-col items-center justify-center gap-3 text-ink">
             <Spinner className="size-10 text-pay" />
             <p className="font-semibold">Processing payment…</p>
             <p className="text-sm text-ink-muted">Don&apos;t close this screen</p>
@@ -71,7 +103,7 @@ export function PaySheet({
               </div>
               <button
                 type="button"
-                onClick={step === "pin" ? () => (setStep("method"), setPin("")) : onClose}
+                onClick={step === "pin" ? () => (setStep("method"), setPin("")) : close}
                 aria-label={step === "pin" ? "Back to payment methods" : "Close"}
                 className={`flex size-10 items-center justify-center rounded-full text-ink hover:bg-surface-2 ${FOCUS}`}
               >
@@ -80,7 +112,7 @@ export function PaySheet({
             </div>
 
             {step === "method" ? (
-              <>
+              <div key="method" className="animate-rise">
                 <fieldset className="space-y-2">
                   <legend className="mb-2 text-xs font-semibold text-ink-muted">Pay using</legend>
                   {METHODS.map((m) => {
@@ -136,9 +168,9 @@ export function PaySheet({
                 <Button className="mt-3" onClick={next}>
                   {PIN_MODES.includes(mode) ? "Pay securely" : `Pay ${formatINR(amountPaise)}`}
                 </Button>
-              </>
+              </div>
             ) : (
-              <>
+              <div key="pin" className="animate-rise">
                 <p className="text-center text-sm text-ink-muted">Enter UPI PIN (any 4 to 6 digits)</p>
                 <p
                   aria-live="polite"
@@ -148,7 +180,7 @@ export function PaySheet({
                   {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
                     <span
                       key={i}
-                      className={`size-3 rounded-full ${i < pin.length ? "bg-pay-deep" : "border border-line-strong"}`}
+                      className={`size-3 rounded-full ${i < pin.length ? "animate-pop bg-pay-deep" : "border border-line-strong"}`}
                     />
                   ))}
                 </p>
@@ -172,7 +204,7 @@ export function PaySheet({
                 <Button className="mt-3" disabled={pin.length < 4} onClick={() => onPay(mode, fail)}>
                   Pay {formatINR(amountPaise)}
                 </Button>
-              </>
+              </div>
             )}
             <p className="mt-2 flex items-center justify-center gap-1 text-xs text-ink-muted">
               <Icon name="lock" className="size-3.5" /> Mock payment, no money moves

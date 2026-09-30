@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { BillPresentment, Receipt } from "@/lib/domain/types";
 import { formatINR } from "@/lib/domain/money";
 import { formatCycle } from "@/lib/domain/cycle";
@@ -37,7 +37,7 @@ export function BillScreen({
       onBack={onBack}
       footer={<Button onClick={onPay}>Pay {formatINR(bill.amountPaise)}</Button>}
     >
-      <Card className="text-center">
+      <Card className="animate-rise text-center">
         <p className="text-xs text-ink-muted">
           {bill.customerName} · {displayVehicle(bill.vehicleRegNo)}
         </p>
@@ -52,7 +52,7 @@ export function BillScreen({
         </p>
       </Card>
 
-      <Card className="mt-3 p-0">
+      <Card className="mt-3 animate-rise p-0 [animation-delay:80ms]">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
@@ -162,19 +162,45 @@ function ReceiptActions({ receipt, orderId }: { receipt: Receipt; orderId?: stri
   );
 }
 
-function Hero({ tone, title, amountPaise, sub }: { tone: "success" | "danger"; title: string; amountPaise: number; sub: string }) {
+/**
+ * Result mark: the white disc pops in, a ring pings once, then the tick (or cross) draws itself.
+ * stroke-dasharray = path length; the `draw` keyframe runs dashoffset from --len to 0.
+ */
+function ResultMark({ tone }: { tone: "success" | "danger" }) {
+  const stroke = { strokeDasharray: 18, ["--len" as string]: 18 } as CSSProperties;
   return (
-    <div className={`shrink-0 px-4 pb-6 pt-8 text-center text-white ${tone === "success" ? "bg-success" : "bg-danger"}`}>
+    <span className="relative mx-auto mb-2 flex size-14 items-center justify-center">
+      <span aria-hidden="true" className="absolute inset-0 animate-ping-once rounded-full bg-white opacity-0 [animation-delay:350ms]" />
       <span
-        className={`mx-auto mb-2 flex size-14 items-center justify-center rounded-full bg-white ${
+        className={`relative flex size-14 animate-pop items-center justify-center rounded-full bg-white ${
           tone === "success" ? "text-success" : "text-danger"
         }`}
       >
-        <Icon name={tone === "success" ? "check" : "x"} className="size-8" />
+        <svg
+          viewBox="0 0 24 24"
+          className={`size-8 ${tone === "danger" ? "animate-shake [animation-delay:700ms]" : ""}`}
+          fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {tone === "success" ? (
+            <path d="m6 12.5 4 4 8-9" pathLength={18} style={stroke} className="animate-draw [animation-delay:300ms]" />
+          ) : (
+            <>
+              <path d="M7 7l10 10" pathLength={18} style={stroke} className="animate-draw [animation-delay:300ms]" />
+              <path d="M17 7 7 17" pathLength={18} style={stroke} className="animate-draw [animation-delay:450ms]" />
+            </>
+          )}
+        </svg>
       </span>
-      <h1 className="text-base font-semibold">{title}</h1>
-      <p className="mt-1 text-3xl font-bold tabular-nums">{formatINR(amountPaise)}</p>
-      <p className="mt-1 text-sm text-white/90">{sub}</p>
+    </span>
+  );
+}
+
+function Hero({ tone, title, amountPaise, sub }: { tone: "success" | "danger"; title: string; amountPaise: number; sub: string }) {
+  return (
+    <div className={`shrink-0 px-4 pb-6 pt-8 text-center text-white ${tone === "success" ? "bg-success" : "bg-danger"}`}>
+      <ResultMark tone={tone} />
+      <h1 className="animate-rise text-base font-semibold [animation-delay:250ms]">{title}</h1>
+      <p className="mt-1 animate-rise text-3xl font-bold tabular-nums [animation-delay:320ms]">{formatINR(amountPaise)}</p>
+      <p className="mt-1 animate-rise text-sm text-white/90 [animation-delay:390ms]">{sub}</p>
     </div>
   );
 }
@@ -192,7 +218,7 @@ export function ReceiptScreen({
     return (
       <div className="flex h-full flex-col bg-pay-canvas">
         <Hero tone="danger" title="Payment failed" amountPaise={view.amountPaise} sub="You haven't been charged" />
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="min-h-0 flex-1 animate-rise overflow-y-auto p-3 [animation-delay:500ms]">
           <Card>
             <p className="text-sm text-ink">{view.message}</p>
             {view.couOrderId && (
@@ -222,7 +248,7 @@ export function ReceiptScreen({
         amountPaise={r.amountPaise}
         sub={`to ${r.billerName} · ${formatDateTime(r.paidAt)}`}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 animate-rise overflow-y-auto p-3 [animation-delay:500ms]">
         <Card>
           <dl className="divide-y divide-line">
             <Row label="Bharat Connect ref" value={r.bbpsTxnRef} mono />

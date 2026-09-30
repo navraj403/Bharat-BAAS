@@ -4,14 +4,19 @@ import { Icon } from "./icons";
 export const FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pay";
 
-export function Spinner({ className = "" }: { className?: string }) {
+/** `decorative` spinners sit inside a control that already says it's busy (aria-busy), so they stay silent. */
+export function Spinner({ className = "", decorative = false }: { className?: string; decorative?: boolean }) {
   return (
     <span
-      role="status"
-      aria-label="Loading"
+      {...(decorative ? { "aria-hidden": true } : { role: "status", "aria-label": "Loading" })}
       className={`inline-block size-5 animate-spin rounded-full border-2 border-current border-t-transparent ${className}`}
     />
   );
+}
+
+/** Shimmering placeholder bar; size it with className (h-4 w-24 …). */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <span aria-hidden="true" className={`skeleton ${className}`} />;
 }
 
 /** Generic Bharat Connect style mark (placeholder, not the real logo). */
@@ -70,10 +75,11 @@ export function Button({ variant = "primary", loading, children, className = "",
     <button
       type="button"
       disabled={disabled || loading}
-      className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${FOCUS} ${className}`}
+      aria-busy={loading || undefined}
+      className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-semibold transition duration-150 ease-out-soft active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${styles} ${FOCUS} ${className}`}
       {...rest}
     >
-      {loading && <Spinner className="size-4" />}
+      {loading && <Spinner decorative className="size-4" />}
       {children}
     </button>
   );
