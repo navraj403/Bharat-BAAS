@@ -4,36 +4,38 @@ import { useState } from "react";
 import type { BillerSummary, FetchResult, Receipt } from "@/lib/domain/types";
 import { formatINR } from "@/lib/domain/money";
 import { formatCycle } from "@/lib/domain/cycle";
-import { BharatConnect, Button, Card, FOCUS, Initials, Screen, Skeleton, Spinner } from "./ui";
+import { BharatConnect, Button, Card, FOCUS, Initials, MeterPeMark, Screen, Skeleton, Spinner, Tile, type TileTone } from "./ui";
 import { Icon, type IconName } from "./icons";
 import { MODE_LABEL, displayVehicle, formatDate, isValidMobile, isValidVehicle, nextBillDate } from "./format";
 
 // ─── Home ────────────────────────────────────────────────────────────────────
 
-const QUICK: { icon: IconName; label: string }[] = [
-  { icon: "scan", label: "Scan & pay" },
-  { icon: "send", label: "To mobile" },
-  { icon: "bank", label: "To bank" },
-  { icon: "wallet", label: "Balance" },
+const QUICK: { icon: IconName; label: string; tone: string }[] = [
+  { icon: "scan", label: "Scan & pay", tone: "bg-tile-blue/10 text-tile-blue" },
+  { icon: "send", label: "To mobile", tone: "bg-tile-violet/10 text-tile-violet" },
+  { icon: "bank", label: "To bank", tone: "bg-tile-cyan/10 text-tile-cyan" },
+  { icon: "wallet", label: "Balance", tone: "bg-tile-amber/10 text-tile-amber" },
 ];
 
-const CATEGORIES: { id: string; label: string; icon: IconName; enabled?: boolean }[] = [
-  { id: "ev", label: "EV battery", icon: "battery", enabled: true },
-  { id: "elec", label: "Electricity", icon: "bulb" },
-  { id: "mobile", label: "Mobile", icon: "phone" },
-  { id: "fastag", label: "FASTag", icon: "road" },
-  { id: "gas", label: "Gas", icon: "flame" },
-  { id: "water", label: "Water", icon: "droplet" },
-  { id: "emi", label: "Loan EMI", icon: "receipt" },
-  { id: "more", label: "More", icon: "dots" },
+const CATEGORIES: { id: string; label: string; icon: IconName; tone: TileTone; enabled?: boolean }[] = [
+  { id: "ev", label: "EV battery", icon: "battery", tone: "green", enabled: true },
+  { id: "elec", label: "Electricity", icon: "bulb", tone: "amber" },
+  { id: "mobile", label: "Mobile", icon: "phone", tone: "blue" },
+  { id: "fastag", label: "FASTag", icon: "road", tone: "violet" },
+  { id: "gas", label: "Gas", icon: "flame", tone: "red" },
+  { id: "water", label: "Water", icon: "droplet", tone: "cyan" },
+  { id: "emi", label: "Loan EMI", icon: "receipt", tone: "pink" },
+  { id: "more", label: "More", icon: "dots", tone: "slate" },
 ];
 
 export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => void }) {
   return (
     <div className="flex h-full flex-col bg-pay-canvas">
-      <header className="shrink-0 bg-pay-deep px-4 pb-4 pt-4 text-white">
+      <header className="shrink-0 bg-pay-bar px-4 pb-4 pt-4 text-white">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">DemoPay</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold">
+            <MeterPeMark size={30} /> MeterPe
+          </h1>
           <span className="flex items-center gap-3">
             <button
               type="button"
@@ -52,7 +54,7 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
         <button
           type="button"
           onClick={onEv}
-          className="mt-3 flex h-10 w-full items-center gap-2 rounded-full bg-white px-4 text-left text-sm text-ink-faint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="mt-3 flex h-10 w-full items-center gap-2 rounded-xl bg-pay-bar-2 px-4 text-left text-sm text-white/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           <Icon name="search" className="size-4" /> Search bills, billers
         </button>
@@ -63,7 +65,7 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
           <ul className="grid grid-cols-4 gap-1 text-center text-xs text-ink">
             {QUICK.map((q) => (
               <li key={q.label} title="Not part of this demo" className="text-ink-muted">
-                <span className="mx-auto mb-1 flex size-11 items-center justify-center rounded-full bg-pay-soft text-pay">
+                <span className={`mx-auto mb-1 flex size-11 items-center justify-center rounded-xl ${q.tone}`}>
                   <Icon name={q.icon} />
                 </span>
                 {q.label}
@@ -82,8 +84,8 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
                   disabled={!c.enabled}
                   onClick={c.enabled ? onEv : undefined}
                   title={c.enabled ? undefined : "Coming soon"}
-                  className={`relative flex w-full flex-col items-center rounded-lg py-1 ${FOCUS} ${
-                    c.enabled ? "font-semibold text-ink" : "cursor-not-allowed text-ink-faint"
+                  className={`relative flex w-full flex-col items-center rounded-lg py-1 transition active:scale-95 ${FOCUS} ${
+                    c.enabled ? "font-semibold text-ink" : "cursor-not-allowed text-ink-muted"
                   }`}
                 >
                   {c.enabled && (
@@ -91,12 +93,8 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
                       New
                     </span>
                   )}
-                  <span
-                    className={`mb-1 flex size-11 items-center justify-center rounded-full ${
-                      c.enabled ? "bg-pay text-white" : "bg-surface-2 text-ink-faint"
-                    }`}
-                  >
-                    <Icon name={c.icon} />
+                  <span className="mb-1">
+                    <Tile icon={c.icon} tone={c.tone} />
                   </span>
                   {c.label}
                 </button>
@@ -110,9 +108,7 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
           onClick={onEv}
           className={`flex w-full items-center gap-3 rounded-2xl border border-pay-line bg-pay-soft p-3 text-left ${FOCUS}`}
         >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pay text-white">
-            <Icon name="battery" />
-          </span>
+          <Tile icon="battery" tone="green" round />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-pay-deep">Pay your EV battery bill</span>
             <span className="block text-xs text-pay">Pay-per-km BaaS bills, now on Bharat Connect</span>
@@ -125,9 +121,7 @@ export function HomeScreen({ onEv, onHelp }: { onEv: () => void; onHelp: () => v
           onClick={onHelp}
           className={`flex w-full items-center gap-3 rounded-2xl border border-line bg-white p-3 text-left ${FOCUS}`}
         >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-pay-soft text-pay">
-            <Icon name="support" className="size-6" />
-          </span>
+          <Tile icon="support" tone="amber" round />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-ink">Help &amp; support</span>
             <span className="block text-xs text-ink-muted">Raise a complaint about a payment · Track your tickets</span>

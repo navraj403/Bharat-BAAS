@@ -42,12 +42,27 @@
   --color-info: #0e7490;
   --color-info-soft: #e5f6f9;
 
-  /* Customer app (DemoPay) palette: wallet-app style deep indigo. Generic, not any real app's brand. */
-  --color-pay: #534ab7;
-  --color-pay-deep: #3c3489;
-  --color-pay-soft: #eeedfe;
-  --color-pay-line: #e2e0f3;
-  --color-pay-canvas: #f4f3fb;
+  /* Customer app (MeterPe) palette: navy app bar + bright green actions. Generic, not any real app's brand. */
+  --color-pay: #15803d;           /* primary green: CTAs, selected states (white text 5:1) */
+  --color-pay-hover: #166534;
+  --color-pay-deep: #14532d;      /* dark green text on pay-soft, PIN dots */
+  --color-pay-soft: #dcfce7;
+  --color-pay-line: #d5e3dc;
+  --color-pay-canvas: #f3f6fa;
+  --color-pay-bar: #0f2a4a;       /* navy app bar, "Total due" figure */
+  --color-pay-bar-2: #1f3f66;     /* search field / chips on the navy bar */
+  --color-pay-accent: #facc15;    /* gauge needle, "Fastest" tag */
+  --color-pay-accent-ink: #422006; /* text on pay-accent */
+
+  /* Category and method tiles: white icon on a bright fill (each ≥3:1 for non-text contrast). */
+  --color-tile-green: #16a34a;
+  --color-tile-amber: #d97706;
+  --color-tile-blue: #2563eb;
+  --color-tile-violet: #7c3aed;
+  --color-tile-red: #dc2626;
+  --color-tile-cyan: #0891b2;
+  --color-tile-pink: #db2777;
+  --color-tile-slate: #475569;
 
   /* Shape */
   --radius-card: 0.75rem;
@@ -111,7 +126,8 @@ body {
 /* A blue ring on a blue button is invisible: use ink on filled accent/pay controls. */
 .bg-accent:focus-visible,
 .bg-pay:focus-visible,
-.bg-pay-deep:focus-visible {
+.bg-pay-deep:focus-visible,
+.bg-pay-bar:focus-visible {
   outline-color: var(--color-ink);
 }
 
