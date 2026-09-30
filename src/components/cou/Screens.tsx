@@ -259,12 +259,14 @@ export function BillersScreen({
 // ─── Details + inline fetch result (Paytm-style) ─────────────────────────────
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+// Each chip belongs to the biller that holds that seeded customer (supabase/seed.sql), so it
+// only shows on that biller's form.
 const DEMO_CHIPS = [
-  { label: "Riya · Bill due", v: "MH01AB1001", m: "9800000001" },
-  { label: "Arjun · Overdue", v: "MH01AB1002", m: "9800000002" },
-  { label: "Meera · Paid", v: "MH01AB1003", m: "9800000003" },
-  { label: "Kabir · No bill", v: "MH01AB1004", m: "9800000004" },
-  { label: "Wrong mobile", v: "MH01AB1001", m: "9111111111" },
+  { label: "Riya · Bill due", billerId: "bajaj-finance", v: "MH01AB1001", m: "9800000001" },
+  { label: "Arjun · Overdue", billerId: "bajaj-finance", v: "MH01AB1002", m: "9800000002" },
+  { label: "Meera · Paid", billerId: "volt-leasing", v: "MH01AB1003", m: "9800000003" },
+  { label: "Kabir · No bill", billerId: "bajaj-finance", v: "MH01AB1004", m: "9800000004" },
+  { label: "Wrong mobile", billerId: "bajaj-finance", v: "MH01AB1001", m: "9111111111" },
 ];
 
 /** A fetch result that stays on the details form (everything except BILL_DUE). */
@@ -478,11 +480,11 @@ export function DetailsScreen({
         </p>
       )}
 
-      {DEMO_MODE && (
+      {DEMO_MODE && DEMO_CHIPS.some((c) => c.billerId === biller.id) && (
         <div className="mt-4">
           <p className="mb-2 px-1 text-xs font-semibold text-ink-faint">Demo numbers</p>
           <div className="flex flex-wrap gap-2">
-            {DEMO_CHIPS.map((c) => (
+            {DEMO_CHIPS.filter((c) => c.billerId === biller.id).map((c) => (
               <button
                 key={c.label}
                 type="button"
